@@ -153,13 +153,14 @@ echo "$CR_PAT" | docker login ghcr.io -u JunWan666 --password-stdin
 
 ### 一键下载 Compose 文件
 
-下面的命令会从 GitHub `v1.0.1` Release 对应的源码标签下载 Compose 文件和 GHCR 配置，不需要克隆整个仓库：
+下面的命令会从 GitHub `v1.0.2` Release 对应的源码标签下载 Compose 文件和 GHCR 配置，不需要克隆整个仓库。当前仓库为私有仓库，先准备一个同时拥有仓库读取权限和 `read:packages` 权限的 GitHub Token：
 
 Linux/macOS：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.0.1/docker-compose.yml -o docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.0.1/ghcr-compose.env -o .env
+export GITHUB_TOKEN=ghp_your_token
+curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.0.2/docker-compose.yml -o docker-compose.yml
+curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.0.2/ghcr-compose.env -o .env
 docker login ghcr.io
 docker compose pull
 docker compose up --detach --no-build --wait
@@ -168,8 +169,9 @@ docker compose up --detach --no-build --wait
 Windows PowerShell：
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/JunWan666/bili-insight/v1.0.1/docker-compose.yml -OutFile docker-compose.yml
-Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/JunWan666/bili-insight/v1.0.1/ghcr-compose.env -OutFile .env
+$headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN" }
+Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.0.2/docker-compose.yml -OutFile docker-compose.yml
+Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.0.2/ghcr-compose.env -OutFile .env
 docker login ghcr.io
 docker compose pull
 docker compose up --detach --no-build --wait
