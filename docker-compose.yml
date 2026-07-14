@@ -2,7 +2,7 @@ name: bili-insight
 
 services:
   backend:
-    image: bili-insight-backend:local
+    image: ${BACKEND_IMAGE:-bili-insight-backend:local}
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
@@ -70,7 +70,7 @@ services:
       - application
 
   frontend:
-    image: bili-insight-frontend:local
+    image: ${FRONTEND_IMAGE:-bili-insight-frontend:local}
     build:
       context: .
       dockerfile: docker/frontend.Dockerfile

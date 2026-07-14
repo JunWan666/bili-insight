@@ -122,6 +122,35 @@ Copy-Item .env.example .env
 docker compose up --detach --build --wait
 ```
 
+### 使用 GHCR 镜像
+
+发布后的镜像地址为：
+
+```text
+ghcr.io/junwan666/bili-insight-backend:latest
+ghcr.io/junwan666/bili-insight-frontend:latest
+```
+
+将 `.env` 中的镜像变量改为：
+
+```dotenv
+BACKEND_IMAGE=ghcr.io/junwan666/bili-insight-backend:latest
+FRONTEND_IMAGE=ghcr.io/junwan666/bili-insight-frontend:latest
+```
+
+然后拉取并启动，不再本地构建：
+
+```bash
+docker compose pull
+docker compose up --detach --no-build --wait
+```
+
+GHCR 包可能继承 GitHub 仓库的私有可见性。首次拉取私有包前需要使用拥有该仓库访问权限的 GitHub Personal Access Token 登录：
+
+```bash
+echo "$CR_PAT" | docker login ghcr.io -u JunWan666 --password-stdin
+```
+
 Linux/macOS：
 
 ```bash
