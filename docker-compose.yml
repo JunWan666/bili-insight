@@ -1,0 +1,123 @@
+name: bili-insight
+
+services:
+  backend:
+    image: bili-insight-backend:local
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        BACKEND_EXTRAS: ${BACKEND_EXTRAS:-}
+    restart: unless-stopped
+    cpus: ${BACKEND_CPUS:-4.0}
+    mem_limit: ${BACKEND_MEMORY_LIMIT:-6g}
+    pids_limit: ${BACKEND_PIDS_LIMIT:-256}
+    environment:
+      APP_ENVIRONMENT: production
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      APP_NETWORK_MODE: trusted_proxy
+      APP_DATABASE_URL: ${APP_DATABASE_URL:-sqlite+aiosqlite:////app/runtime/data/bili_insight.db}
+      APP_DATA_DIR: /app/runtime/data
+      APP_ARTIFACT_DIR: /app/runtime/artifacts
+      APP_TEMP_DIR: /app/runtime/temp
+      APP_LOG_DIR: /app/runtime/logs
+      APP_COOKIE_ENCRYPTION_KEY_FILE: /app/secrets/cookie-encryption.key
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+      APP_LOG_JSON: ${APP_LOG_JSON:-true}
+      APP_AUTO_CREATE_SCHEMA: "false"
+      APP_CORS_ORIGINS: ""
+      APP_METADATA_CACHE_TTL_SECONDS: ${APP_METADATA_CACHE_TTL_SECONDS:-1200}
+      APP_STREAM_CACHE_TTL_SECONDS: ${APP_STREAM_CACHE_TTL_SECONDS:-300}
+      APP_UPSTREAM_TIMEOUT_SECONDS: ${APP_UPSTREAM_TIMEOUT_SECONDS:-20}
+      APP_UPSTREAM_CONNECT_TIMEOUT_SECONDS: ${APP_UPSTREAM_CONNECT_TIMEOUT_SECONDS:-5}
+      APP_UPSTREAM_RETRIES: ${APP_UPSTREAM_RETRIES:-2}
+      APP_UPSTREAM_MAX_RESPONSE_BYTES: ${APP_UPSTREAM_MAX_RESPONSE_BYTES:-8388608}
+      APP_COOKIE_UPLOAD_MAX_BYTES: ${APP_COOKIE_UPLOAD_MAX_BYTES:-1048576}
+      APP_COOKIE_MAX_ITEMS: ${APP_COOKIE_MAX_ITEMS:-300}
+      GENERATE_COOKIE_KEY: "true"
+      RUN_DATABASE_MIGRATIONS: "true"
+      OMP_NUM_THREADS: ${NATIVE_PROCESS_THREADS:-4}
+      OPENBLAS_NUM_THREADS: ${NATIVE_PROCESS_THREADS:-4}
+      MKL_NUM_THREADS: ${NATIVE_PROCESS_THREADS:-4}
+      NUMEXPR_NUM_THREADS: ${NATIVE_PROCESS_THREADS:-4}
+    volumes:
+      - app-runtime:/app/runtime
+      - app-secrets:/app/secrets
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3).read(1024)"
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 4
+    stop_grace_period: 45s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+    networks:
+      - application
+
+  frontend:
+    image: bili-insight-frontend:local
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    restart: unless-stopped
+    cpus: ${FRONTEND_CPUS:-1.0}
+    mem_limit: ${FRONTEND_MEMORY_LIMIT:-512m}
+    pids_limit: ${FRONTEND_PIDS_LIMIT:-96}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /var/cache/nginx:rw,noexec,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --output-document=-
+        - http://127.0.0.1:8080/nginx-health
+      interval: 15s
+      timeout: 3s
+      start_period: 10s
+      retries: 4
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+    networks:
+      - application
+
+networks:
+  application:
+    driver: bridge
+
+volumes:
+  app-runtime:
+    name: bili-insight-runtime
+  app-secrets:
+    name: bili-insight-secrets

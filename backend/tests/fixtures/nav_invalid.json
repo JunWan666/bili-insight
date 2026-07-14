@@ -1,0 +1,9 @@
+{
+  "code": 0,
+  "message": "0",
+  "data": {
+    "isLogin": false,
+    "vipStatus": 0,
+    "vipType": 0
+  }
+}

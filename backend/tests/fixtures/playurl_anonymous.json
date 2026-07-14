@@ -1,0 +1,54 @@
+{
+  "code": 0,
+  "message": "0",
+  "data": {
+    "quality": 64,
+    "accept_quality": [64, 32, 16],
+    "accept_description": ["720P", "480P", "360P"],
+    "support_formats": [
+      {"quality": 64, "need_login": false, "need_vip": false},
+      {"quality": 32, "need_login": false, "need_vip": false},
+      {"quality": 16, "need_login": false, "need_vip": false}
+    ],
+    "dash": {
+      "duration": 100,
+      "video": [
+        {
+          "id": 64,
+          "baseUrl": "https://cdn-a.bilivideo.com/video/720-avc.m4s?deadline=1&token=redacted",
+          "backupUrl": [],
+          "bandwidth": 1400000,
+          "mimeType": "video/mp4",
+          "codecs": "avc1.64001F",
+          "codecid": 7,
+          "width": 1280,
+          "height": 720,
+          "frameRate": "25"
+        },
+        {
+          "id": 64,
+          "baseUrl": "https://cdn-a.bilivideo.com/video/720-hevc.m4s?deadline=1&token=redacted",
+          "backupUrl": [],
+          "bandwidth": 900000,
+          "mimeType": "video/mp4",
+          "codecs": "hev1.1.6.L120.90",
+          "codecid": 12,
+          "width": 1280,
+          "height": 720,
+          "frameRate": "25"
+        }
+      ],
+      "audio": [
+        {
+          "id": 30280,
+          "baseUrl": "https://cdn-a.bilivideo.com/audio/aac.m4s?deadline=1&token=redacted",
+          "backupUrl": [],
+          "bandwidth": 192000,
+          "mimeType": "audio/mp4",
+          "codecs": "mp4a.40.2",
+          "codecid": 0
+        }
+      ]
+    }
+  }
+}

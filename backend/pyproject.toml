@@ -1,0 +1,86 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bili-insight-backend"
+version = "1.0.0"
+description = "Secure FastAPI backend for Bilibili video parsing, analysis, and downloads"
+requires-python = ">=3.12"
+dependencies = [
+  "aiosqlite>=0.20,<1",
+  "alembic>=1.14,<2",
+  "cryptography>=48.0.1,<49",
+  "defusedxml>=0.7.1,<1",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "orjson>=3.10,<4",
+  "pydantic-settings>=2.7,<3",
+  "python-multipart>=0.0.20,<1",
+  "sqlalchemy>=2.0.36,<3",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+analysis-asr = [
+  "faster-whisper>=1.1,<2",
+]
+analysis-ocr = [
+  "paddleocr>=3,<4",
+  "paddlepaddle>=3,<4",
+]
+analysis = [
+  "faster-whisper>=1.1,<2",
+  "paddleocr>=3,<4",
+  "paddlepaddle>=3,<4",
+]
+dev = [
+  "mypy>=1.14,<2",
+  "pip-audit>=2.10,<3",
+  "pytest>=9.0.3,<10",
+  "pytest-asyncio>=0.25,<2",
+  "pytest-cov>=6,<8",
+  "respx>=0.22,<1",
+  "ruff>=0.9,<1",
+  "types-defusedxml>=0.7.0.20260504,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers --cov=app --cov-report=term-missing"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+]
+fail_under = 85
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "S", "RUF"]
+ignore = ["B008", "RUF001", "S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S104", "S105", "S106", "S107", "S310"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+exclude = ["alembic"]
+
+[[tool.mypy.overrides]]
+module = ["orjson.*"]
+ignore_missing_imports = true

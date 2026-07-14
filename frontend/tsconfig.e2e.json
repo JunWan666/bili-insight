@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["node", "@playwright/test"]
+  },
+  "include": ["playwright.config.ts", "playwright.channels.config.ts", "e2e/**/*.ts"]
+}

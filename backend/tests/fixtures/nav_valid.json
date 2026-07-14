@@ -1,0 +1,10 @@
+{
+  "code": 0,
+  "message": "0",
+  "data": {
+    "isLogin": true,
+    "uname": "测试会员",
+    "vipStatus": 1,
+    "vipType": 2
+  }
+}

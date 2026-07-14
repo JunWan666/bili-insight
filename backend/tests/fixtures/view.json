@@ -1,0 +1,30 @@
+{
+  "code": 0,
+  "message": "0",
+  "ttl": 1,
+  "data": {
+    "bvid": "BV1FYT5zkE1q",
+    "aid": 114857171391061,
+    "title": "固定响应解析样例",
+    "desc": "用于验证 Provider 字段适配的脱敏固定响应。",
+    "pic": "http://i0.hdslb.com/bfs/archive/sample.jpg",
+    "duration": 218,
+    "pubdate": 1752451200,
+    "copyright": 1,
+    "owner": {"name": "样例UP主"},
+    "stat": {
+      "view": 1200,
+      "danmaku": 30,
+      "reply": 12,
+      "favorite": 88,
+      "coin": 42,
+      "share": 5,
+      "like": 160
+    },
+    "rights": {"bp": 0, "elec": 0, "download": 1, "movie": 0, "pay": 0, "copyright": 1},
+    "pages": [
+      {"cid": 31000000001, "page": 1, "part": "序章", "duration": 100},
+      {"cid": 31000000002, "page": 2, "part": "后会有期", "duration": 118}
+    ]
+  }
+}

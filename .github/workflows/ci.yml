@@ -1,0 +1,201 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-safety:
+    name: Repository safety
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Reject tracked credentials
+        run: python scripts/check_repository_secrets.py
+      - name: Verify credential ignore rules
+        shell: bash
+        run: |
+          probe="ci-probe.cookies.json"
+          touch "$probe"
+          git check-ignore --quiet "$probe"
+          rm "$probe"
+
+  backend:
+    name: Backend quality
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e './backend[dev]'
+      - name: Run Ruff
+        working-directory: backend
+        run: python -m ruff check . && python -m ruff format --check .
+      - name: Run mypy
+        working-directory: backend
+        run: python -m mypy app
+      - name: Audit Python dependencies
+        working-directory: backend
+        run: python -m pip_audit . --strict --progress-spinner off && python -m pip_audit --local --skip-editable --progress-spinner off
+      - name: Run backend tests
+        working-directory: backend
+        run: python -m pytest
+
+  frontend:
+    name: Frontend quality
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Run frontend lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Run frontend type check
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm run test
+      - name: Audit Node dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  frontend-e2e:
+    name: Frontend E2E (${{ matrix.browser_family }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs:
+      - frontend
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - browser_family: chromium
+            browser_install: chromium
+            test_script: test:e2e:chromium
+          - browser_family: webkit
+            browser_install: webkit
+            test_script: test:e2e:webkit
+          - browser_family: firefox
+            browser_install: firefox
+            test_script: test:e2e:firefox
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright ${{ matrix.browser_family }}
+        working-directory: frontend
+        run: npx playwright install --with-deps ${{ matrix.browser_install }}
+      - name: Run fixed-fixture ${{ matrix.browser_family }} E2E tests
+        working-directory: frontend
+        run: npm run ${{ matrix.test_script }}
+      - name: Upload Playwright failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.browser_family }}-failure
+          path: frontend/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  containers:
+    name: Container build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs:
+      - backend
+      - frontend
+      - frontend-e2e
+      - repository-safety
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Validate Compose model
+        run: docker compose --env-file .env.example config --quiet
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/backend.Dockerfile
+          push: false
+          tags: bili-insight-backend:local
+          load: true
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/frontend.Dockerfile
+          push: false
+          tags: bili-insight-frontend:local
+          load: true
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+      - name: Start the production stack and verify persistence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cleanup() {
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              docker compose --env-file .env.example ps || true
+              docker compose --env-file .env.example logs --no-color --tail=200 || true
+            fi
+            docker compose --env-file .env.example down --volumes --remove-orphans || true
+            exit "$status"
+          }
+          trap cleanup EXIT
+          docker compose --env-file .env.example up --detach --no-build --wait
+          curl --fail --silent --show-error http://127.0.0.1:8080/healthz >/dev/null
+          test "$(docker compose exec -T backend id -u | tr -d '\r')" = "10001"
+          test "$(docker compose exec -T frontend id -u | tr -d '\r')" != "0"
+          docker compose exec -T backend test -s /app/secrets/cookie-encryption.key
+          docker compose exec -T backend sh -c 'printf persistence-ok > /app/runtime/data/.ci-volume-probe'
+          docker compose restart backend
+          timeout 90 sh -c 'until docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8000/api/v1/health/ready\", timeout=3).read(1024)"; do sleep 2; done'
+          docker compose exec -T backend grep -qx persistence-ok /app/runtime/data/.ci-volume-probe
+          docker compose exec -T backend rm /app/runtime/data/.ci-volume-probe
