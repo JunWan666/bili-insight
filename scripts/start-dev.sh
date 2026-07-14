@@ -41,6 +41,7 @@ export APP_LOG_JSON=false
 export APP_AUTO_CREATE_SCHEMA=false
 export APP_CORS_ORIGINS='http://127.0.0.1:5173,http://localhost:5173'
 export VITE_PROXY_TARGET=http://127.0.0.1:8000
+export VITE_DEV_HOST="${VITE_DEV_HOST:-127.0.0.1}"
 
 cd "${root}/backend"
 "${python}" -m alembic upgrade head

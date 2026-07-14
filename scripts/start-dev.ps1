@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet("127.0.0.1", "0.0.0.0")]
+    [string]$HostAddress = "127.0.0.1"
+)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -50,6 +53,7 @@ $env:APP_LOG_JSON = "false"
 $env:APP_AUTO_CREATE_SCHEMA = "false"
 $env:APP_CORS_ORIGINS = "http://127.0.0.1:5173,http://localhost:5173"
 $env:VITE_PROXY_TARGET = "http://127.0.0.1:8000"
+$env:VITE_DEV_HOST = $HostAddress
 
 Push-Location $backendDirectory
 try {

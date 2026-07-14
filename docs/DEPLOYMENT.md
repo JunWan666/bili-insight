@@ -4,7 +4,7 @@
 
 标准部署由 `frontend` 和 `backend` 两个容器组成。`frontend` 使用 Nginx 提供静态资源、SSE、API、同源 DASH 预览和产物下载反向代理；`backend` 运行单个 Uvicorn Worker，以保证进程内任务协调状态与短期预览会话一致。后端可以访问 Bilibili 元数据/PGC 上游和受限媒体 CDN，但没有主机端口映射。
 
-主机只发布 `127.0.0.1:${WEB_PORT}`。这与 PRD 的本地单用户默认模型一致，也避免因误改后端监听地址而直接暴露 Cookie 管理接口。
+主机默认只发布 `${WEB_HOST:-127.0.0.1}:${WEB_PORT}`。这与 PRD 的本地单用户默认模型一致，也避免因误改后端监听地址而直接暴露 Cookie 管理接口。`WEB_HOST=0.0.0.0` 可用于可信局域网内的临时移动端验收，但不会改变后端无主机端口映射的边界。
 
 ## 首次部署
 
@@ -87,7 +87,15 @@ docker compose exec backend ffprobe -version
 
 ## 局域网与公网
 
-标准 Compose 文件不提供非回环地址绑定。移动设备需要通过局域网访问时，应在本机网关之前增加受信任的 HTTPS 反向代理，并同时满足：
+标准 Compose 默认使用回环地址。移动设备需要在隔离且可信的家庭或办公局域网中临时验收时，可在 `.env` 中设置 `WEB_HOST=0.0.0.0`，然后执行：
+
+```bash
+docker compose up --detach --force-recreate frontend
+```
+
+同一网络中的设备可访问 `http://<主机局域网IP>:${WEB_PORT}`。该模式只发布 Nginx 网关，不发布 FastAPI 端口；但局域网中任何能访问该端口的设备都可以使用当前单用户应用，因此不得在公共 Wi-Fi、访客网络、端口转发或公网 IP 上使用。验收结束后应把 `WEB_HOST` 改回 `127.0.0.1`。
+
+长期局域网或公网部署应在本机网关之前增加受信任的 HTTPS 反向代理，并同时满足：
 
 - 强制用户鉴权，凭据不写入前端构建产物。
 - 使用有效 HTTPS，HTTP 自动跳转到 HTTPS。
@@ -104,7 +112,7 @@ docker compose exec backend ffprobe -version
 - `trusted_proxy`：只适用于后端没有外部端口、入口网关受控的部署。
 - `public`：必须设置高强度 `APP_API_KEY`，否则配置校验拒绝启动；同时仍需 HTTPS、速率限制和租户隔离评估。
 
-仅把 Docker 端口绑定从 `127.0.0.1` 改为 `0.0.0.0` 不构成安全的局域网部署。
+仅把 Docker 端口绑定从 `127.0.0.1` 改为 `0.0.0.0` 只适用于受控网络中的临时验收，不构成可长期运行的安全局域网部署。
 
 ## 资源与保留策略
 

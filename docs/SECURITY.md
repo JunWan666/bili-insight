@@ -19,6 +19,7 @@ Docker 的加密主密钥位于 `bili-insight-secrets` 卷，数据库位于 `bi
 ## 网络安全
 
 - 默认网关只绑定 `127.0.0.1`，后端不发布主机端口。
+- `WEB_HOST=0.0.0.0` 只用于隔离、可信局域网中的临时移动端验收，并且只暴露 Nginx 网关。当前版本没有独立应用账号体系，不得在公共 Wi-Fi、访客网络、端口转发或公网 IP 上启用。
 - Bilibili 链接使用协议、域名和地址白名单校验，跳转目标需要逐跳重新校验。
 - Cookie 依照 CookieJar 域和 path 规则发送，并限制到明确允许的 Bilibili 服务域。
 - 媒体流只允许访问配置中的精确 CDN 后缀；番剧 PGC 额外仅放行
@@ -28,7 +29,7 @@ Docker 的加密主密钥位于 `bili-insight-secrets` 卷，数据库位于 `bi
 - 页面标题、简介、字幕、OCR、弹幕和分析文本均按不可信内容处理。
 - Nginx 设置 CSP、`frame-ancestors`、`nosniff`、Referrer Policy 与 Permissions Policy。
 
-公网或局域网代理要求见 [部署与运维说明](DEPLOYMENT.md)。没有 HTTPS 和应用鉴权时，不得开放非回环监听。
+公网或长期局域网代理要求见 [部署与运维说明](DEPLOYMENT.md)。没有 HTTPS 和应用鉴权时，非回环监听只能用于隔离可信网络中的短期验收。
 
 ## 在线预览安全
 
