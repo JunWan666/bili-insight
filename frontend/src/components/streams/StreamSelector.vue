@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Check, CircleCheck, Lock, Select, VideoCamera } from '@element-plus/icons-vue'
+import { Check, CircleCheck, Lock, Select, VideoCamera, VideoPlay } from '@element-plus/icons-vue'
 import type { DownloadPreset, MediaStream, StreamCollection } from '@/types/api'
+import { useMobile } from '@/composables/useMobile'
 import { formatBitrate, formatBytes } from '@/utils/format'
 import { codecFamily } from '@/utils/mediaCompatibility'
 
@@ -20,6 +21,7 @@ const emit = defineEmits<{
   'update:selectedVideoId': [value: string | null]
   'update:selectedAudioId': [value: string | null]
   configure: []
+  preview: []
   verify: [streamIds: string[]]
 }>()
 
@@ -33,6 +35,18 @@ const presets: Array<{ value: DownloadPreset; label: string; hint: string }> = [
 
 const selectedVideo = computed(() => props.streams.videos.find((stream) => stream.id === props.selectedVideoId) ?? null)
 const selectedAudio = computed(() => props.streams.audios.find((stream) => stream.id === props.selectedAudioId) ?? null)
+const { isMobile } = useMobile()
+const selectedVideoPreviewable = computed(() => hasPreviewMetadata(selectedVideo.value))
+const audioPreviewFallback = computed(() => (
+  selectedAudio.value && !hasPreviewMetadata(selectedAudio.value)
+    ? '所选音轨缺少在线预览信息，播放时将临时使用无音轨模式；下载不受影响。'
+    : null
+))
+const previewTooltip = computed(() => {
+  if (!selectedVideoPreviewable.value) return '该视频规格暂不具备浏览器预览信息'
+  if (audioPreviewFallback.value) return audioPreviewFallback.value
+  return '使用当前所选视频和音频规格播放'
+})
 const unverifiedSelectedStreamIds = computed(() => (
   [selectedVideo.value, selectedAudio.value]
     .filter((stream): stream is MediaStream => Boolean(stream && !stream.verifiedAt))
@@ -40,6 +54,10 @@ const unverifiedSelectedStreamIds = computed(() => (
 ))
 const hasSelectedStream = computed(() => Boolean(selectedVideo.value || selectedAudio.value))
 const lastResolutionFallback = ref<string | null>(null)
+
+function hasPreviewMetadata(stream: MediaStream | null): stream is MediaStream {
+  return Boolean(stream?.previewSupported && stream.mimeType && stream.codecString)
+}
 
 function videoScore(stream: MediaStream): number {
   return (stream.height ?? 0) * 1_000_000_000 + (stream.fps ?? 0) * 1_000_000 + (stream.bitrate ?? 0)
@@ -246,9 +264,25 @@ watch(
         <strong v-if="selectedVideo">{{ selectedVideo.qualityLabel }} · {{ selectedVideo.codec }}</strong>
         <strong v-else>仅音频</strong>
         <span> + {{ selectedAudio ? `${selectedAudio.codec} ${formatBitrate(selectedAudio.bitrate)}` : '不附加音频' }}</span>
+        <small v-if="audioPreviewFallback" class="preview-fallback">{{ audioPreviewFallback }}</small>
       </div>
       <div class="selection-actions">
-        <el-tooltip content="仅读取极小范围媒体数据，不下载完整文件" placement="top">
+        <el-tooltip
+          :disabled="isMobile"
+          :content="previewTooltip"
+          placement="top"
+        >
+          <el-button
+            size="large"
+            :icon="VideoPlay"
+            :disabled="!selectedVideoPreviewable"
+            data-testid="open-video-preview"
+            @click="$emit('preview')"
+          >
+            立即播放
+          </el-button>
+        </el-tooltip>
+        <el-tooltip :disabled="isMobile" content="仅读取极小范围媒体数据，不下载完整文件" placement="top">
           <el-button
             size="large"
             :icon="CircleCheck"
@@ -308,6 +342,7 @@ watch(
 .selection-bar small { display: block; margin-bottom: 4px; color: var(--text-tertiary); }
 .selection-bar strong { overflow-wrap: anywhere; }
 .selection-bar span { color: var(--text-secondary); }
+.selection-bar .preview-fallback { max-width: 620px; margin: 6px 0 0; color: var(--warning); line-height: 1.45; }
 .selection-actions { display: flex; align-items: center; gap: 9px; }
 
 @media (max-width: 1000px) {

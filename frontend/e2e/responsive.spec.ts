@@ -57,6 +57,12 @@ async function assertTouchTarget(locator: Locator, name: string): Promise<void> 
   expect(Math.round(box?.height ?? 0), `${name} 触控高度`).toBeGreaterThanOrEqual(44)
 }
 
+async function activate(locator: Locator, page: Page): Promise<void> {
+  const viewport = page.viewportSize()
+  if (viewport && viewport.width < 768) await locator.tap()
+  else await locator.click()
+}
+
 test('全部核心页面在目标视口无页面级横向溢出', async ({ page, testApi }) => {
   testApi.setAuthenticated(true)
   for (const contract of pageContracts) {
@@ -66,12 +72,69 @@ test('全部核心页面在目标视口无页面级横向溢出', async ({ page,
   }
 
   await page.goto('/videos/video-e2e')
-  await page.getByTestId('tab-technical-analysis').click()
+  await activate(page.getByTestId('tab-technical-analysis'), page)
   await expect(page.getByTestId('analysis-result-media')).toBeVisible()
   await assertNoPageOverflow(page, '/videos/video-e2e#technical-analysis')
-  await page.getByTestId('tab-content-analysis').click()
+  await activate(page.getByTestId('tab-content-analysis'), page)
   await expect(page.getByTestId('analysis-result-summary')).toBeVisible()
   await assertNoPageOverflow(page, '/videos/video-e2e#content-analysis')
+})
+
+test('桌面工作区充分利用宽度且主要操作位于首屏', async ({ page, testApi }, testInfo) => {
+  const viewportWidth = testInfo.project.use.viewport?.width ?? 0
+  const viewportHeight = testInfo.project.use.viewport?.height ?? 0
+  test.skip(viewportWidth < 1200, '仅桌面宽屏布局执行空间利用门禁')
+
+  testApi.setAuthenticated(true)
+  const contracts = [
+    { path: '/', view: '.home-view', primary: '.recent-section' },
+    { path: '/jobs', view: '.jobs-view', primary: '.job-card:first-of-type' },
+    { path: '/artifacts', view: '.artifacts-view', primary: '.artifact-content' },
+    { path: '/settings', view: '.settings-view', primary: '.auth-actions' },
+    { path: '/diagnostics', view: '.diagnostics-view', primary: '.metrics-grid' },
+  ]
+
+  for (const contract of contracts) {
+    await page.goto(contract.path)
+    const dimensions = await page.locator(contract.view).evaluate((view) => {
+      const main = document.querySelector<HTMLElement>('.main-content')
+      if (!main) throw new Error('缺少主内容区')
+      const mainRect = main.getBoundingClientRect()
+      const viewRect = view.getBoundingClientRect()
+      return {
+        leftGap: Math.round(viewRect.left - mainRect.left),
+        rightGap: Math.round(mainRect.right - viewRect.right),
+      }
+    })
+    expect(dimensions.leftGap, `${contract.path} 左侧不应保留大块空白`).toBeLessThanOrEqual(42)
+    expect(dimensions.rightGap, `${contract.path} 右侧不应保留大块空白`).toBeLessThanOrEqual(42)
+
+    const primary = page.locator(contract.primary).first()
+    await expect(primary, `${contract.path} 的主要操作区应可见`).toBeVisible()
+    const box = await primary.boundingBox()
+    expect(box, `${contract.path} 的主要操作区应可测量`).not.toBeNull()
+    expect(box?.y ?? viewportHeight, `${contract.path} 的主要操作区应在首屏开始`).toBeLessThan(viewportHeight)
+  }
+
+  await page.goto('/videos/video-e2e')
+  await expect(page.locator('.workspace')).toBeVisible()
+  const detailLayout = await page.evaluate(() => {
+    const root = document.documentElement
+    const workspace = document.querySelector<HTMLElement>('.workspace')
+    const workspaceBody = document.querySelector<HTMLElement>('.workspace-body')
+    return {
+      clientHeight: root.clientHeight,
+      scrollHeight: root.scrollHeight,
+      workspaceBottom: workspace ? Math.round(workspace.getBoundingClientRect().bottom) : null,
+      workspaceBodyOverflow: workspaceBody ? getComputedStyle(workspaceBody).overflowY : null,
+    }
+  })
+  expect(detailLayout.scrollHeight, '视频详情不应产生页面级纵向滚动').toBeLessThanOrEqual(
+    detailLayout.clientHeight + 1,
+  )
+  expect(detailLayout.workspaceBottom, '视频工作区应完整收在当前视口内').not.toBeNull()
+  expect(detailLayout.workspaceBottom ?? viewportHeight + 1).toBeLessThanOrEqual(viewportHeight)
+  expect(detailLayout.workspaceBodyOverflow).toBe('auto')
 })
 
 test('手机首屏展示链接输入、身份状态和解析操作', async ({ page }, testInfo) => {

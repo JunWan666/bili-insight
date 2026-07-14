@@ -16,6 +16,7 @@ from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
 from app.db.models import JobType
 from app.db.session import create_engine, create_schema, create_session_factory
+from app.media.security import DNSResolver
 from app.providers.bilibili import BilibiliProvider
 from app.providers.models import VideoProvider
 from app.services.analyses import (
@@ -28,6 +29,7 @@ from app.services.auth import AuthService
 from app.services.diagnostics import DiagnosticsService
 from app.services.downloads import DownloadExecutor
 from app.services.jobs import JobService
+from app.services.previews import PreviewService
 from app.services.runtime_settings import RuntimeSettingsCoordinator
 from app.services.settings import SettingsService
 from app.services.videos import VideoService
@@ -38,16 +40,28 @@ def create_app(
     *,
     provider: VideoProvider | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
+    media_resolver: DNSResolver | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
     configure_logging(resolved_settings)
     resolved_settings.ensure_directories()
     engine = create_engine(resolved_settings)
     session_factory = create_session_factory(engine)
-    resolved_provider = provider or BilibiliProvider(resolved_settings, transport=transport)
+    resolved_provider = provider or BilibiliProvider(
+        resolved_settings,
+        transport=transport,
+        media_resolver=media_resolver,
+    )
     auth_service = AuthService(resolved_settings, session_factory, resolved_provider)
     video_service = VideoService(
         resolved_settings, session_factory, resolved_provider, auth_service
+    )
+    preview_service = PreviewService(
+        resolved_settings,
+        session_factory,
+        video_service,
+        transport=transport,
+        media_resolver=media_resolver,
     )
     settings_service = SettingsService(resolved_settings, session_factory)
     artifact_service = ArtifactService(resolved_settings, session_factory)
@@ -107,6 +121,7 @@ def create_app(
     )
     settings_service.register_update_callback(diagnostics_service.apply_runtime_settings)
     auth_service.register_clear_callback(video_service.clear_authenticated_cache)
+    auth_service.register_clear_callback(preview_service.clear_authenticated_sessions)
     container = ApplicationContainer(
         settings=resolved_settings,
         engine=engine,
@@ -114,6 +129,7 @@ def create_app(
         provider=resolved_provider,
         auth_service=auth_service,
         video_service=video_service,
+        preview_service=preview_service,
         settings_service=settings_service,
         artifact_service=artifact_service,
         download_executor=download_executor,
@@ -139,6 +155,7 @@ def create_app(
             # directory has become the active artifact root so interrupted
             # retention moves cannot be mistaken for untracked files.
             await artifact_service.reconcile_retained_files()
+            await preview_service.start()
             await job_service.start()
             await job_service.start_maintenance(runtime_settings.maintenance_policy)
             application.state.container = container
@@ -147,7 +164,10 @@ def create_app(
             try:
                 await job_service.stop()
             finally:
-                await engine.dispose()
+                try:
+                    await preview_service.stop()
+                finally:
+                    await engine.dispose()
 
     application = FastAPI(
         title=resolved_settings.app_name,

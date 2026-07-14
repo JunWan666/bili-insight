@@ -97,7 +97,7 @@ onBeforeUnmount(() => {
       <RouterLink to="/settings"><AuthStatusBadge :status="auth.status" :loading="auth.loading" compact /></RouterLink>
     </header>
 
-    <main class="main-content">
+    <main class="main-content" :class="{ 'is-video-workspace': route.path.startsWith('/videos/') }">
       <RouterView v-slot="{ Component }">
         <Transition name="page" mode="out-in">
           <component :is="Component" />
@@ -162,6 +162,11 @@ onBeforeUnmount(() => {
 .page-enter-active, .page-leave-active { transition: opacity .16s ease, transform .16s ease; }
 .page-enter-from { opacity: 0; transform: translateY(5px); }
 .page-leave-to { opacity: 0; transform: translateY(-3px); }
+
+@media (min-width: 1200px) {
+  .main-content { padding: 30px clamp(24px, 2.2vw, 40px) 42px; }
+  .main-content.is-video-workspace { height: 100dvh; min-height: 0; overflow: hidden; }
+}
 
 @media (min-width: 768px) and (max-width: 1199px) {
   .sidebar { width: 84px; padding-inline: 12px; }

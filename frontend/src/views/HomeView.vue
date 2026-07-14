@@ -106,7 +106,7 @@ onMounted(() => {
         </div>
 
         <form novalidate @submit.prevent="parseVideo">
-          <label class="sr-only" for="video-url">Bilibili 视频链接、BV 号或 AV 号</label>
+          <label class="sr-only" for="video-url">Bilibili 视频链接、BV/AV 号或 ss/ep 标识</label>
           <div class="input-row" :class="{ invalid: validationMessage }">
             <el-input
               id="video-url"
@@ -114,7 +114,7 @@ onMounted(() => {
               data-testid="video-url-input"
               size="large"
               clearable
-              placeholder="https://www.bilibili.com/video/BV..."
+              placeholder="BV/AV 投稿链接或 bangumi/play/ss..."
               autocomplete="off"
               @input="validationMessage = ''"
               @keyup.enter="parseVideo"
@@ -191,21 +191,21 @@ onMounted(() => {
 
     <section class="support-note surface-card">
       <div class="support-icon"><Key /></div>
-      <div><h2>支持范围与使用边界</h2><p>当前支持普通 BV/AV 投稿视频及分 P。工具不会绕过付费、DRM、验证码或平台访问控制；请仅处理你有权访问和使用的内容，并遵守平台条款与版权法律。</p></div>
+      <div><h2>支持范围与使用边界</h2><p>当前支持普通 BV/AV 投稿、分 P，以及番剧 ss/ep Season 与剧集链接。工具不会绕过付费、DRM、验证码或平台访问控制；请仅处理你有权访问和使用的内容，并遵守平台条款与版权法律。</p></div>
       <RouterLink to="/settings">管理 Cookie <el-icon><ArrowRight /></el-icon></RouterLink>
     </section>
   </div>
 </template>
 
 <style scoped>
-.home-view { max-width: 1260px; margin: 0 auto; }
-.hero { display: grid; grid-template-columns: minmax(300px, .84fr) minmax(520px, 1.16fr); align-items: center; gap: clamp(42px, 7vw, 100px); min-height: 520px; padding: 42px 0 68px; }
+.home-view { width: 100%; }
+.hero { display: grid; grid-template-columns: minmax(290px, .82fr) minmax(500px, 1.18fr); align-items: center; gap: clamp(32px, 4vw, 64px); min-height: 0; padding: 10px 0 28px; }
 .eyebrow, .step-label { color: var(--brand); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.hero-copy h1 { margin: 15px 0 22px; font-size: clamp(42px, 5vw, 68px); line-height: 1.08; letter-spacing: -.055em; }
+.hero-copy h1 { margin: 12px 0 18px; font-size: 52px; line-height: 1.08; letter-spacing: 0; }
 .hero-copy h1 span { color: var(--brand); }
-.lead { max-width: 580px; margin: 0; color: var(--text-secondary); font-size: 16px; line-height: 1.8; }
-.parse-panel { padding: clamp(22px, 3vw, 34px); }
-.panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.lead { max-width: 580px; margin: 0; color: var(--text-secondary); font-size: 15px; line-height: 1.65; }
+.parse-panel { padding: 26px; }
+.panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 19px; }
 .panel-heading h2 { margin: 7px 0 0; font-size: 23px; letter-spacing: -.03em; }
 .input-row { display: flex; gap: 8px; }
 .input-row :deep(.el-input__wrapper) { min-height: 52px; }
@@ -213,10 +213,10 @@ onMounted(() => {
 .paste-button { min-width: 92px; }
 .clear-button { display: none; }
 .validation { display: flex; align-items: center; gap: 7px; margin: 9px 0 0; color: var(--danger); line-height: 1.45; }
-.mode-fieldset { padding: 0; margin: 25px 0 0; border: 0; }
+.mode-fieldset { padding: 0; margin: 19px 0 0; border: 0; }
 .mode-fieldset legend { margin-bottom: 11px; color: var(--text-secondary); font-size: 13px; font-weight: 700; }
 .mode-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.mode-options button { display: flex; align-items: flex-start; gap: 9px; min-height: 94px; padding: 13px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); color: var(--text-primary); text-align: left; cursor: pointer; transition: border-color .16s, background .16s; }
+.mode-options button { display: flex; align-items: flex-start; gap: 9px; min-height: 82px; padding: 12px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); color: var(--text-primary); text-align: left; cursor: pointer; transition: border-color .16s, background .16s; }
 .mode-options button.selected { border-color: var(--brand); background: var(--brand-soft); }
 .mode-options button.disabled:not(.selected) { opacity: .62; }
 .radio-mark { display: grid; place-items: center; flex: 0 0 auto; width: 19px; height: 19px; margin-top: 1px; border: 1.5px solid var(--line); border-radius: 50%; color: transparent; }
@@ -226,12 +226,13 @@ onMounted(() => {
 .mode-options strong { margin-bottom: 5px; font-size: 13px; }
 .mode-options small { color: var(--text-tertiary); line-height: 1.4; }
 .auth-explanation { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--surface-muted); color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
-.parse-button { width: 100%; min-height: 52px; margin-top: 19px; }
+.parse-button { width: 100%; min-height: 48px; margin-top: 15px; }
 .parse-error { margin-top: 16px; }
-.recent-section, .capabilities { padding: 42px 0; }
-.section-heading { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
-.section-heading h2 { margin: 6px 0 0; font-size: 27px; letter-spacing: -.035em; }
-.section-heading p { margin: 8px 0 0; color: var(--text-secondary); }
+.recent-section { padding: 20px 0 28px; }
+.capabilities { padding: 32px 0; }
+.section-heading { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 16px; }
+.section-heading h2 { margin: 4px 0 0; font-size: 24px; letter-spacing: 0; }
+.section-heading p { margin: 5px 0 0; color: var(--text-secondary); }
 .recent-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .recent-card { overflow: hidden; color: inherit; text-decoration: none; transition: transform .16s, box-shadow .16s; }
 .recent-card:hover { transform: translateY(-2px); box-shadow: 0 11px 30px rgba(31, 36, 51, .1); }
@@ -258,9 +259,12 @@ onMounted(() => {
 @media (max-width: 1199px) {
   .hero { grid-template-columns: 1fr; min-height: 0; padding-top: 20px; }
   .hero-copy { max-width: 760px; }
-  .hero-copy h1 { font-size: clamp(42px, 7vw, 65px); }
+  .hero-copy h1 { font-size: 52px; }
   .parse-panel { max-width: 800px; }
   .recent-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1200px) and (max-width: 1365px) {
+  .hero-copy h1 { font-size: 46px; }
 }
 @media (max-width: 767px) {
   .hero {

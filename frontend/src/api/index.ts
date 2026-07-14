@@ -11,6 +11,7 @@ import {
   normalizeJob,
   normalizeJobList,
   normalizeParseResponse,
+  normalizePreviewSession,
   normalizeStreams,
   normalizeStreamVerification,
   normalizeStorageStatus,
@@ -30,6 +31,7 @@ import type {
   CreateAnalysisRequest,
   CreateDownloadBatchRequest,
   CreateDownloadRequest,
+  CreatePreviewRequest,
   Diagnostics,
   EditTranscriptRequest,
   DownloadCreationResult,
@@ -38,6 +40,7 @@ import type {
   JobFilters,
   PageResult,
   ParsedVideoResult,
+  PreviewSession,
   RecentVideo,
   StreamCollection,
   StreamVerificationResult,
@@ -83,6 +86,16 @@ export const videoApi = {
   async recent(limit = 8): Promise<RecentVideo[]> {
     const { data } = await http.get<RecentVideo[] | { items: RecentVideo[] }>('/videos', { params: { limit } })
     return Array.isArray(data) ? data : data.items
+  },
+}
+
+export const previewApi = {
+  async create(request: CreatePreviewRequest): Promise<PreviewSession> {
+    const { data } = await http.post<unknown>('/previews', request)
+    return normalizePreviewSession(unwrap(data))
+  },
+  async remove(sessionId: string): Promise<void> {
+    await http.delete(`/previews/${encodeURIComponent(sessionId)}`)
   },
 }
 

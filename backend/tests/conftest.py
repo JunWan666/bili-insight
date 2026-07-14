@@ -32,6 +32,7 @@ class UpstreamFixtureServer:
     cookie_headers: list[tuple[str, str]] = field(default_factory=list)
     force_invalid_auth: bool = False
     force_auth_network_error: bool = False
+    force_pgc_anonymous_preview: bool = False
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -49,6 +50,8 @@ class UpstreamFixtureServer:
             return httpx.Response(200, json=load_fixture(fixture), request=request)
         if path == "/x/web-interface/view":
             return httpx.Response(200, json=load_fixture("view.json"), request=request)
+        if path == "/pgc/view/web/season":
+            return httpx.Response(200, json=load_fixture("pgc_season.json"), request=request)
         if path == "/x/tag/archive/tags":
             return httpx.Response(200, json=load_fixture("tags.json"), request=request)
         if path == "/x/player/playurl":
@@ -56,6 +59,22 @@ class UpstreamFixtureServer:
                 "playurl_authenticated.json"
                 if "SESSDATA=test-session-value" in cookie_header
                 else "playurl_anonymous.json"
+            )
+            return httpx.Response(200, json=load_fixture(fixture), request=request)
+        if path == "/pgc/player/web/playurl":
+            if (
+                self.force_pgc_anonymous_preview
+                and "SESSDATA=test-session-value" not in cookie_header
+            ):
+                preview = load_fixture("pgc_playurl_anonymous.json")
+                result = preview.get("result")
+                if isinstance(result, dict):
+                    result["is_preview"] = 1
+                return httpx.Response(200, json=preview, request=request)
+            fixture = (
+                "pgc_playurl_authenticated.json"
+                if "SESSDATA=test-session-value" in cookie_header
+                else "pgc_playurl_anonymous.json"
             )
             return httpx.Response(200, json=load_fixture(fixture), request=request)
         if path == "/x/player/v2":
@@ -90,11 +109,11 @@ class UpstreamFixtureServer:
                 request=request,
             )
         request_host = (request.headers.get("Host") or request.url.host or "").split(":", 1)[0]
-        if request_host.endswith(("bilivideo.com", "bilivideo.cn")):
+        if request_host.endswith(("bilivideo.com", "bilivideo.cn", "edge.mountaintoys.cn")):
             return httpx.Response(
                 206,
                 headers={"Content-Range": "bytes 0-1023/4096"},
-                content=b"0" * 1_024,
+                stream=httpx.ByteStream(b"0" * 1_024),
                 request=request,
             )
         return httpx.Response(404, json={"code": -404}, request=request)
@@ -136,7 +155,12 @@ async def api_client(
         transport=transport,
         media_resolver=fixture_media_resolver,
     )
-    app = create_app(settings, provider=provider)
+    app = create_app(
+        settings,
+        provider=provider,
+        transport=transport,
+        media_resolver=fixture_media_resolver,
+    )
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:

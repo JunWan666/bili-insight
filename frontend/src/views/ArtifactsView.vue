@@ -229,7 +229,7 @@ onMounted(() => { void loadArtifacts(); void loadDisk() })
           <el-table-column label="任务状态" width="125"><template #default="{ row }"><el-tag v-if="row.retained" effect="plain" type="warning">受管保留</el-tag><el-tag v-else-if="row.jobStatus" effect="plain" :type="jobStatusMap[row.jobStatus].type">{{ jobStatusMap[row.jobStatus].label }}</el-tag><span v-else>暂无</span></template></el-table-column>
           <el-table-column label="文件信息" min-width="160"><template #default="{ row }">{{ formatBytes(row.size) }}<small class="cell-sub">{{ row.mediaInfo?.container || row.mimeType }}<template v-if="row.mediaInfo?.duration"> · {{ formatDuration(row.mediaInfo.duration) }}</template></small></template></el-table-column>
           <el-table-column label="创建时间" min-width="150"><template #default="{ row }">{{ formatDate(row.createdAt) }}<small class="cell-sub">{{ row.expiresAt ? `清理于 ${formatDate(row.expiresAt)}` : '手动保留' }}</small></template></el-table-column>
-          <el-table-column label="操作" width="210" fixed="right"><template #default="{ row }"><el-button text :icon="View" @click="openDetails(row)">详情</el-button><el-button text type="primary" :icon="Download" @click="downloadArtifact(row)">保存</el-button><el-button text type="danger" :icon="Delete" @click="removeArtifact(row)" /></template></el-table-column>
+          <el-table-column label="操作" width="236" fixed="right"><template #default="{ row }"><el-button text :icon="View" @click="openDetails(row)">详情</el-button><el-button text type="primary" :icon="Download" @click="downloadArtifact(row)">保存</el-button><el-button text type="danger" :icon="Delete" @click="removeArtifact(row)" /></template></el-table-column>
         </el-table>
       </div>
 
@@ -265,17 +265,24 @@ onMounted(() => { void loadArtifacts(); void loadDisk() })
 </template>
 
 <style scoped>
-.artifacts-view { max-width: 1200px; margin: 0 auto; }
-.disk-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px; margin-bottom: 15px; padding: 17px; }
+.artifacts-view { width: 100%; }
+.disk-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; margin-bottom: 11px; padding: 12px 14px; }
 .disk-icon { display: grid; place-items: center; width: 43px; height: 43px; border-radius: 12px; background: var(--brand-soft); color: var(--brand); }.disk-icon svg { width: 21px; }
 .disk-copy { display: grid; gap: 8px; min-width: 0; }.disk-copy > div { display: flex; justify-content: space-between; gap: 15px; }.disk-copy span, .disk-copy small { color: var(--text-tertiary); font-size: 11px; }.disk-card a { font-weight: 650; text-decoration: none; }
-.filters { display: grid; grid-template-columns: minmax(200px, 1fr) 145px 150px minmax(250px, auto) auto; gap: 10px; margin-bottom: 15px; padding: 12px; }
+.filters { display: grid; grid-template-columns: minmax(220px, 1fr) 150px 155px minmax(270px, auto) auto; gap: 8px; margin-bottom: 11px; padding: 8px; }
 .artifact-error { margin-bottom: 15px; }
 .artifact-content { min-height: 320px; overflow: hidden; }.cell-sub { display: block; margin-top: 4px; color: var(--text-tertiary); font-size: 10px; }
 .artifact-name { display: flex; align-items: center; gap: 11px; min-width: 0; }.artifact-name > span { display: grid; place-items: center; flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); }.artifact-name strong, .artifact-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.artifact-name strong { max-width: 360px; }.artifact-name small { max-width: 360px; margin-top: 3px; color: var(--text-tertiary); font-size: 10px; }
-.mobile-artifacts { display: none; }.pagination { justify-content: flex-end; padding: 16px; border-top: 1px solid var(--line-soft); }
+.desktop-artifacts :deep(.el-button + .el-button) { margin-left: 4px; }.mobile-artifacts { display: none; }.pagination { justify-content: flex-end; padding: 16px; border-top: 1px solid var(--line-soft); }
 .artifact-detail { min-height: 300px; }.artifact-detail h2 { margin: 20px 0; font-size: 19px; overflow-wrap: anywhere; }.media-preview, .image-preview { display: block; width: 100%; max-height: 360px; border-radius: 13px; background: #0d0f14; object-fit: contain; }.audio-preview { width: 100%; }.text-preview { max-height: 380px; margin: 0; padding: 14px; overflow: auto; border-radius: 12px; background: var(--surface-muted); color: var(--text-secondary); font: 12px/1.65 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }.file-preview { display: grid; place-items: center; gap: 10px; min-height: 180px; padding: 20px; border-radius: 13px; background: var(--surface-muted); color: var(--text-tertiary); text-align: center; }.file-preview .el-icon { font-size: 40px; }.artifact-detail dl { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }.artifact-detail dt { color: var(--text-tertiary); font-size: 10px; }.artifact-detail dd { margin: 5px 0 0; color: var(--text-secondary); overflow-wrap: anywhere; }.checksum { font-family: ui-monospace, monospace; font-size: 11px; }.detail-actions { display: flex; gap: 9px; margin-top: 24px; }
-@media (max-width: 1000px) { .filters { grid-template-columns: 1fr 150px; }.filters :deep(.el-date-editor) { width: 100%; } }
+@media (min-width: 1200px) {
+  .artifact-content { display: flex; flex-direction: column; height: calc(100dvh - 292px); min-height: 320px; }
+  .desktop-artifacts { min-height: 0; overflow: auto; }
+  .artifact-name strong, .artifact-name small { max-width: none; }
+  .pagination { flex: 0 0 auto; }
+}
+@media (min-width: 1200px) and (max-width: 1279px) { .artifact-content { height: calc(100dvh - 345px); } }
+@media (max-width: 1279px) { .filters { grid-template-columns: 1fr 150px; }.filters :deep(.el-date-editor) { width: 100%; } }
 @media (max-width: 767px) {
   .disk-card { grid-template-columns: auto 1fr; }.disk-card a { grid-column: 2; }.disk-copy > div { display: grid; gap: 4px; }
   .filters { grid-template-columns: 1fr; }.filters :deep(.el-date-editor) { width: 100%; }

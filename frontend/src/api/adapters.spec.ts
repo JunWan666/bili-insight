@@ -12,6 +12,7 @@ import {
   normalizeJobEvent,
   normalizeJobList,
   normalizeParseResponse,
+  normalizePreviewSession,
   normalizeStreams,
   normalizeStorageStatus,
 } from './adapters'
@@ -67,7 +68,7 @@ describe('backend response adapters', () => {
       },
       streams: {
         partId: 'part-1',
-        video: [{ id: 'v1', kind: 'video', qualityCode: 112, qualityLabel: '1080P+', codec: 'H.264', container: 'mp4', width: 1920, height: 1080, fps: 25, bitrate: 3550000, hdrType: null, estimatedSize: 96800000, authRequired: true, premiumRequired: true, accessRequirement: 'premium', verifiedAt: '2026-07-14T00:01:00Z', compatibility: '广泛兼容' }],
+        video: [{ id: 'v1', kind: 'video', qualityCode: 112, qualityLabel: '1080P+', codec: 'H.264', codecString: 'avc1.640032', mimeType: 'video/mp4', previewSupported: true, container: 'mp4', width: 1920, height: 1080, fps: 25, bitrate: 3550000, hdrType: null, estimatedSize: 96800000, authRequired: true, premiumRequired: true, accessRequirement: 'premium', verifiedAt: '2026-07-14T00:01:00Z', compatibility: '广泛兼容' }],
         audio: [{ id: 'a1', kind: 'audio', qualityCode: 30280, qualityLabel: '高码率', codec: 'AAC', container: 'm4a', bitrate: 188000, sampleRate: 48000, audioChannels: 2, estimatedSize: 5100000, authRequired: false, compatibility: '广泛兼容' }],
         fetchedAt: '2026-07-14T00:01:00Z',
       },
@@ -94,8 +95,26 @@ describe('backend response adapters', () => {
       premiumRequired: true,
       accessRequirement: 'premium',
       compatibilityNote: '广泛兼容',
+      codecString: 'avc1.640032',
+      mimeType: 'video/mp4',
+      previewSupported: true,
     })
     expect(JSON.stringify(parsed)).not.toContain('baseUrl')
+  })
+
+  it('normalizes a preview response without exposing an upstream media URL', () => {
+    const preview = normalizePreviewSession({
+      id: 'preview-1',
+      manifestUrl: '/api/v1/previews/preview-1/manifest.mpd',
+      expiresAt: '2026-07-14T00:30:00Z',
+      duration: 120,
+      video: { streamId: 'video-stream', mimeType: 'video/mp4', codecString: 'avc1.640028' },
+      audio: { streamId: 'audio-stream', mimeType: 'audio/mp4', codecString: 'mp4a.40.2' },
+    })
+
+    expect(preview.video.codecString).toBe('avc1.640028')
+    expect(preview.audio?.mimeType).toBe('audio/mp4')
+    expect(JSON.stringify(preview)).not.toContain('bilivideo')
   })
 
   it('uses the requested stream identity only as a fallback and trusts an explicit backend access result', () => {

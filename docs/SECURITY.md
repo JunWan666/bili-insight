@@ -12,7 +12,7 @@
 2. 服务端限制文件大小、条目数量、域、path、secure 与过期语义。
 3. 原始上传内容解析后不作为文件保留，API 和前端状态不返回 Cookie 值。
 4. 仅会话模式只在进程内使用；本机记住模式使用 Fernet 认证加密后存储。
-5. 清除登录态时删除内存状态、数据库密文和相关身份缓存，不连带删除用户媒体产物。
+5. 清除登录态时删除内存状态、数据库密文、相关身份缓存和所有登录态预览会话，不连带删除匿名预览或用户媒体产物。
 
 Docker 的加密主密钥位于 `bili-insight-secrets` 卷，数据库位于 `bili-insight-runtime` 卷。镜像、Git 仓库和 `.env` 都不包含密钥。密钥卷丢失后不能恢复已加密 Cookie，应在界面清除旧登录态并重新上传 Cookie。
 
@@ -21,11 +21,26 @@ Docker 的加密主密钥位于 `bili-insight-secrets` 卷，数据库位于 `bi
 - 默认网关只绑定 `127.0.0.1`，后端不发布主机端口。
 - Bilibili 链接使用协议、域名和地址白名单校验，跳转目标需要逐跳重新校验。
 - Cookie 依照 CookieJar 域和 path 规则发送，并限制到明确允许的 Bilibili 服务域。
+- 媒体流只允许访问配置中的精确 CDN 后缀；番剧 PGC 额外仅放行
+  `edge.mountaintoys.cn`。当前真实 PGC URL 使用的 TLS `4483` 端口也只对该精确后缀开放，
+  不会放宽到整个 `mountaintoys.cn` 域、相似后缀或其他端口。
 - 上游请求具有连接/总超时、最大响应体、并发限制和有限退避重试。
 - 页面标题、简介、字幕、OCR、弹幕和分析文本均按不可信内容处理。
 - Nginx 设置 CSP、`frame-ancestors`、`nosniff`、Referrer Policy 与 Permissions Policy。
 
 公网或局域网代理要求见 [部署与运维说明](DEPLOYMENT.md)。没有 HTTPS 和应用鉴权时，不得开放非回环监听。
+
+## 在线预览安全
+
+- 浏览器通过 `POST /api/v1/previews` 获取短期会话 ID 和同源 MPD；MPD 只包含 `media/video`、`media/audio` 相对路径，不返回 Bilibili 签名 URL、Cookie、Referer 或上游 Host。
+- 预览服务按所选流的匿名/登录上下文校验身份，不能用匿名会话读取登录流，也不能把不同分 P 的视频和音频组合到同一会话。
+- 上游媒体请求不携带 Cookie，只使用服务端短期签名地址、固定 Bilibili Referer 和必要 Range 请求头。CookieJar 仅用于 Bilibili 元数据、身份和媒体地址解析流程。
+- 每次打开媒体源都重新执行精确 CDN 后缀、公共 DNS、IP 固定和 TLS SNI 校验；不跟随上游重定向，不允许私网、回环、链路本地或解析后地址变化绕过 SSRF 边界。
+- 代理仅接受单个受限 Byte Range，并验证 200/206/416、`Content-Range`、`Content-Length`、identity 编码与预期 MIME。响应只转发必要的 Range、长度、ETag/Last-Modified 和安全缓存头，过滤 Set-Cookie、Location 及其他上游头。
+- 默认每个 Range 最多 64 MiB、并发上游媒体请求最多 8、进程内预览会话最多 32。会话空闲 30 分钟过期，绝对生命周期最多 6 小时，超过上限淘汰最久未访问会话。
+- CDN 地址返回 401/403/404/410 或网络失败时，服务端只按同一规格强制刷新一次；媒体结构发生变化时拒绝继续使用旧会话，要求重新解析。
+- 前端关闭弹窗时主动删除会话；后端重启清除全部会话，清除 Cookie 则额外同步清除登录态会话。预览会话和签名地址不写入数据库、浏览器存储或日志。
+- Shaka Player 按需加载并固定当前所选规格。浏览器无法解码 HEVC、AV1、HDR 等格式属于客户端能力边界，界面应提示改选 H.264 + AAC，不能以转发到第三方播放器的方式绕过同源安全模型。
 
 ## 文件与进程
 

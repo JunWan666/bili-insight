@@ -94,6 +94,180 @@ async def test_authenticated_parse_marks_added_capabilities(
     assert all(item["accessRequirement"] == "none" for item in anonymous_equivalent)
 
 
+async def test_bangumi_season_episode_parse_refresh_and_stream_resolution(
+    api_client: tuple[Any, Any],
+    upstream: UpstreamFixtureServer,
+) -> None:
+    client, app = api_client
+    season_response = await client.post(
+        "/api/v1/videos/parse",
+        json={
+            "url": ("https://www.bilibili.com/bangumi/play/ss28747?from_spmid=666.5.mylist.0"),
+            "accessMode": "anonymous",
+        },
+    )
+
+    assert season_response.status_code == 200, season_response.text
+    season = season_response.json()
+    assert season["normalizedUrl"] == "https://www.bilibili.com/bangumi/play/ss28747"
+    assert season["video"]["provider"] == "bilibili_pgc"
+    assert season["video"]["bvid"] == "SS28747"
+    assert season["video"]["aid"] == 28747
+    assert season["video"]["partCount"] == 2
+    assert season["selectedPartId"] == season["video"]["parts"][0]["id"]
+    assert {item["qualityCode"] for item in season["streams"]["video"]} == {32}
+    assert {item["codec"] for item in season["streams"]["video"]} == {
+        "H.264/AVC",
+        "H.265/HEVC",
+    }
+    assert all(item["previewSupported"] for item in season["streams"]["video"])
+    assert all(item["mimeType"] == "video/mp4" for item in season["streams"]["video"])
+    assert "mountaintoys" not in season_response.text
+    assert "deadline=" not in season_response.text
+    assert "token=" not in season_response.text
+    anonymous_headers = [
+        header
+        for path, header in upstream.cookie_headers
+        if path in {"/pgc/view/web/season", "/pgc/player/web/playurl"}
+    ]
+    assert anonymous_headers
+    assert all("SESSDATA" not in header for header in anonymous_headers)
+
+    episode_response = await client.post(
+        "/api/v1/videos/parse",
+        json={
+            "url": "https://www.bilibili.com/bangumi/play/ep733317",
+            "accessMode": "anonymous",
+        },
+    )
+    assert episode_response.status_code == 200, episode_response.text
+    episode = episode_response.json()
+    assert episode["normalizedUrl"] == "https://www.bilibili.com/bangumi/play/ep733317"
+    assert episode["selectedPartId"] == episode["video"]["parts"][1]["id"]
+
+    video_id = episode["video"]["id"]
+    part_id = episode["selectedPartId"]
+    refreshed = await client.post(
+        f"/api/v1/videos/{video_id}/refresh",
+        json={"accessMode": "anonymous", "partId": part_id},
+    )
+    assert refreshed.status_code == 200, refreshed.text
+    assert refreshed.json()["normalizedUrl"] == ("https://www.bilibili.com/bangumi/play/ep733317")
+    assert refreshed.json()["selectedPartId"] == part_id
+
+    stream_id = refreshed.json()["streams"]["video"][0]["id"]
+    service = app.state.container.video_service
+    service._source_urls.clear()
+    playurl_count = upstream.counts["/pgc/player/web/playurl"]
+    resolved = await service.resolve_stream(stream_id, AccessMode.ANONYMOUS)
+    assert resolved.stream_id == stream_id
+    assert resolved.url.startswith("https://")
+    assert upstream.counts["/pgc/player/web/playurl"] == playurl_count + 1
+
+
+async def test_bangumi_section_episodes_remain_stable_across_ep_and_season_refreshes(
+    api_client: tuple[Any, Any],
+) -> None:
+    client, _ = api_client
+
+    first = await client.post(
+        "/api/v1/videos/parse",
+        json={"url": "ep800001", "accessMode": "anonymous", "forceRefresh": True},
+    )
+    assert first.status_code == 200, first.text
+    first_body = first.json()
+
+    second = await client.post(
+        "/api/v1/videos/parse",
+        json={"url": "ep800002", "accessMode": "anonymous", "forceRefresh": True},
+    )
+    assert second.status_code == 200, second.text
+    second_body = second.json()
+    assert second_body["video"]["id"] == first_body["video"]["id"]
+    assert {part["cid"] for part in second_body["video"]["parts"]} >= {
+        1022370999,
+        1022371000,
+    }
+    assert second_body["selectedPartId"] != first_body["selectedPartId"]
+
+    season = await client.post(
+        "/api/v1/videos/parse",
+        json={"url": "ss28747", "accessMode": "anonymous", "forceRefresh": True},
+    )
+    assert season.status_code == 200, season.text
+    season_body = season.json()
+    assert season_body["video"]["id"] == first_body["video"]["id"]
+    assert {part["cid"] for part in season_body["video"]["parts"]} >= {
+        1022370999,
+        1022371000,
+    }
+    page_numbers = [part["pageNumber"] for part in season_body["video"]["parts"]]
+    assert len(page_numbers) == len(set(page_numbers))
+
+
+async def test_authenticated_bangumi_parse_adds_member_only_quality(
+    api_client: tuple[Any, Any],
+    upstream: UpstreamFixtureServer,
+    valid_cookie_json: bytes,
+) -> None:
+    client, _ = api_client
+    await upload_auth(client, valid_cookie_json)
+    upstream.cookie_headers.clear()
+
+    response = await client.post(
+        "/api/v1/videos/parse",
+        json={
+            "url": "https://www.bilibili.com/bangumi/play/ep733316",
+            "accessMode": "authenticated",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    premium = next(item for item in body["streams"]["video"] if item["qualityCode"] == 120)
+    assert premium["width"] == 3840
+    assert premium["height"] == 2160
+    assert premium["authRequired"] is True
+    assert premium["premiumRequired"] is True
+    assert premium["accessRequirement"] == "premium"
+    assert premium["previewSupported"] is True
+    assert premium["codecString"] == "hev1.2.4.L153.B0"
+    assert body["access"]["actualMode"] == "authenticated"
+    pgc_headers = [
+        header
+        for path, header in upstream.cookie_headers
+        if path in {"/pgc/view/web/season", "/pgc/player/web/playurl"}
+    ]
+    assert any("SESSDATA=test-session-value" in header for header in pgc_headers)
+    assert "test-session-value" not in response.text
+    assert "mountaintoys" not in response.text
+
+
+async def test_authenticated_bangumi_parse_survives_anonymous_preview_only_response(
+    api_client: tuple[Any, Any],
+    upstream: UpstreamFixtureServer,
+    valid_cookie_json: bytes,
+) -> None:
+    client, _ = api_client
+    await upload_auth(client, valid_cookie_json)
+    upstream.force_pgc_anonymous_preview = True
+
+    response = await client.post(
+        "/api/v1/videos/parse",
+        json={
+            "url": "https://www.bilibili.com/bangumi/play/ep733316",
+            "accessMode": "authenticated",
+            "forceRefresh": True,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["access"]["actualMode"] == "authenticated"
+    assert max(item["height"] or 0 for item in body["streams"]["video"]) == 2160
+    assert all(item["authRequired"] for item in body["streams"]["video"])
+
+
 async def test_video_endpoints_and_cache(
     api_client: tuple[Any, Any], upstream: UpstreamFixtureServer
 ) -> None:
@@ -374,3 +548,23 @@ async def test_video_and_stream_upserts_update_and_remove_stale_rows(
     async with container.session_factory() as session:
         count = await session.scalar(select(func.count()).select_from(MediaStream))
     assert count == 2
+
+
+async def test_video_upsert_identity_is_scoped_by_provider(api_client: tuple[Any, Any]) -> None:
+    _, app = api_client
+    container = app.state.container
+    reference = await container.provider.normalize_url("BV1FYT5zkE1q")
+    source = await container.provider.get_video(reference)
+    standard = await container.video_service._upsert_video(source)
+    pgc = await container.video_service._upsert_video(
+        replace(
+            source,
+            provider="bilibili_pgc",
+            bvid="SS28747",
+            title="相同 aid 的固定番剧",
+        )
+    )
+
+    assert pgc.id != standard.id
+    assert pgc.provider == "bilibili_pgc"
+    assert pgc.aid == standard.aid

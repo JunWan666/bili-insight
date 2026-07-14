@@ -1,0 +1,86 @@
+{
+  "code": 0,
+  "message": "success",
+  "result": {
+    "code": 0,
+    "is_preview": 0,
+    "has_paid": true,
+    "accept_quality": [120, 80, 32, 16],
+    "accept_description": ["4K 超清", "1080P 高清", "480P", "360P"],
+    "support_formats": [
+      {"quality": 120, "need_vip": true, "need_login": true},
+      {"quality": 80, "need_vip": false, "need_login": true},
+      {"quality": 32, "need_vip": false, "need_login": false},
+      {"quality": 16, "need_vip": false, "need_login": false}
+    ],
+    "dash": {
+      "duration": 1204,
+      "video": [
+        {
+          "id": 120,
+          "baseUrl": "https://vu5bt87a.edge.mountaintoys.cn:4483/video/pgc-4k-hevc.m4s?deadline=1&token=redacted",
+          "backupUrl": [],
+          "bandwidth": 8600000,
+          "mimeType": "video/mp4",
+          "codecs": "hev1.2.4.L153.B0",
+          "codecid": 12,
+          "width": 3840,
+          "height": 2160,
+          "frameRate": "25",
+          "segment_base": {"initialization": "0-1099", "index_range": "1100-2399"}
+        },
+        {
+          "id": 80,
+          "baseUrl": "https://xu5bp87a.edge.mountaintoys.cn:4483/video/pgc-1080-avc.m4s?deadline=1&token=redacted",
+          "backupUrl": [],
+          "bandwidth": 3600000,
+          "mimeType": "video/mp4",
+          "codecs": "avc1.640028",
+          "codecid": 7,
+          "width": 1920,
+          "height": 1080,
+          "frameRate": "25",
+          "segmentBase": {"initialization": "0-999", "indexRange": "1000-1999"}
+        },
+        {
+          "id": 32,
+          "baseUrl": "https://vu5bt87a.edge.mountaintoys.cn:4483/video/pgc-480-avc.m4s?deadline=1&token=redacted",
+          "backupUrl": [],
+          "bandwidth": 650000,
+          "mimeType": "video/mp4",
+          "codecs": "avc1.64001E",
+          "codecid": 7,
+          "width": 852,
+          "height": 480,
+          "frameRate": "25",
+          "segment_base": {"initialization": "0-899", "index_range": "900-1799"}
+        },
+        {
+          "id": 32,
+          "baseUrl": "https://xu5bp87a.edge.mountaintoys.cn:4483/video/pgc-480-hevc.m4s?deadline=1&token=redacted",
+          "backupUrl": [],
+          "bandwidth": 420000,
+          "mimeType": "video/mp4",
+          "codecs": "hev1.1.6.L120.90",
+          "codecid": 12,
+          "width": 852,
+          "height": 480,
+          "frameRate": "25",
+          "segmentBase": {"initialization": "0-799", "indexRange": "800-1699"}
+        }
+      ],
+      "audio": [
+        {
+          "id": 30280,
+          "baseUrl": "https://6u5bz77a.edge.mountaintoys.cn:4483/audio/pgc-aac.m4s?deadline=1&token=redacted",
+          "backupUrl": [],
+          "bandwidth": 192000,
+          "mimeType": "audio/mp4",
+          "codecs": "mp4a.40.2",
+          "codecid": 0,
+          "segment_base": {"initialization": "0-599", "index_range": "600-999"}
+        }
+      ]
+    }
+  }
+}

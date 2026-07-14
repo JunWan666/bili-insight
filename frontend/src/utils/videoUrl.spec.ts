@@ -20,10 +20,18 @@ describe('normalizeVideoInput', () => {
   })
 
   it.each([
+    ['ss28747', 'https://www.bilibili.com/bangumi/play/ss28747'],
+    ['ep733316', 'https://www.bilibili.com/bangumi/play/ep733316'],
+    ['https://www.bilibili.com/bangumi/play/ss28747?from_spmid=666.5.mylist.0', 'https://www.bilibili.com/bangumi/play/ss28747'],
+  ])('normalizes a bangumi input: %s', (input, expected) => {
+    expect(normalizeVideoInput(input)).toEqual({ url: expected, partNumber: null })
+  })
+
+  it.each([
     'http://www.bilibili.com/video/BV1FYT5zkE1q',
     'https://example.com/video/BV1FYT5zkE1q',
     'file:///etc/passwd',
-    'https://www.bilibili.com/bangumi/play/ep1',
+    'https://www.bilibili.com/bangumi/media/md1',
   ])('rejects unsafe or unsupported input: %s', (value) => {
     expect(() => normalizeVideoInput(value)).toThrow(VideoInputError)
   })

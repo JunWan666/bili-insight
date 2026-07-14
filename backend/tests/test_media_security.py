@@ -16,7 +16,7 @@ from app.media.security import (
 
 async def public_resolver(host: str, port: int) -> Iterable[str]:
     assert host
-    assert port in {443, 8082}
+    assert port in {443, 4483, 8082}
     return ("93.184.216.34", "2001:4860:4860::8888")
 
 
@@ -52,6 +52,25 @@ async def test_mcdn_8082_is_narrowly_allowed_and_uses_actual_port() -> None:
         await validator.resolve("https://mcdn.bilivideo.cn.evil.example:8082/a.m4s")
 
 
+async def test_pgc_cdn_4483_is_narrowly_allowed_and_uses_actual_port() -> None:
+    ports: list[int] = []
+
+    async def resolver(_host: str, port: int) -> Iterable[str]:
+        ports.append(port)
+        return ("93.184.216.34",)
+
+    validator = MediaURLValidator(("edge.mountaintoys.cn",), resolver=resolver)
+    target = await validator.resolve("https://vu5bt87a.edge.mountaintoys.cn:4483/a.m4s")
+    assert target.host_header == "vu5bt87a.edge.mountaintoys.cn:4483"
+    assert target.pinned_url(target.addresses[0]) == "https://93.184.216.34:4483/a.m4s"
+    assert ports == [4483]
+
+    with pytest.raises(UnsafeMediaURLError):
+        await validator.resolve("https://unrelated.mountaintoys.cn:4483/a.m4s")
+    with pytest.raises(UnsafeMediaURLError):
+        await validator.resolve("https://edge.mountaintoys.cn.evil.example:4483/a.m4s")
+
+
 @pytest.mark.parametrize(
     "url",
     [
@@ -82,6 +101,11 @@ async def test_media_validator_rejects_malformed_targets(url: str) -> None:
         (),
         ("127.0.0.1",),
         ("93.184.216.34", "10.0.0.1"),
+        ("fec0::1",),
+        ("ff02::1",),
+        ("64:ff9b::c0a8:101",),
+        ("::ffff:192.168.1.1",),
+        ("2002:c0a8:0101::",),
         ("not-an-ip",),
     ],
 )

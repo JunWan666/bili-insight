@@ -56,7 +56,9 @@ class Settings(BaseSettings):
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
     )
-    allowed_media_host_suffixes: str = "bilivideo.com,bilivideo.cn,bilibili.com,biliapi.net"
+    allowed_media_host_suffixes: str = (
+        "bilivideo.com,bilivideo.cn,bilibili.com,biliapi.net,edge.mountaintoys.cn"
+    )
 
     @field_validator("host")
     @classmethod

@@ -17,6 +17,12 @@ _DNS_NAME = re.compile(
 )
 _MCDN_HTTPS_PORT = 8082
 _MCDN_SUFFIX = "mcdn.bilivideo.cn"
+_PGC_CDN_HTTPS_PORT = 4483
+_PGC_CDN_SUFFIX = "edge.mountaintoys.cn"
+_NAT64_PREFIXES = (
+    ipaddress.IPv6Network("64:ff9b::/96"),
+    ipaddress.IPv6Network("64:ff9b:1::/48"),
+)
 _FILENAME_TEMPLATE_FIELDS = frozenset({"title", "bvid", "page", "part", "quality"})
 
 
@@ -109,9 +115,10 @@ class MediaURLValidator:
         except ValueError as exc:
             raise UnsafeMediaURLError("媒体地址端口无效") from exc
         port = 443 if explicit_port is None else explicit_port
-        if port not in (443, _MCDN_HTTPS_PORT) or (
-            port == _MCDN_HTTPS_PORT and not self._host_matches_suffix(host, _MCDN_SUFFIX)
-        ):
+        special_port_allowed = (
+            port == _MCDN_HTTPS_PORT and self._host_matches_suffix(host, _MCDN_SUFFIX)
+        ) or (port == _PGC_CDN_HTTPS_PORT and self._host_matches_suffix(host, _PGC_CDN_SUFFIX))
+        if port != 443 and not special_port_allowed:
             raise UnsafeMediaURLError("媒体地址端口不在允许范围内")
         decoded_path = unquote(parsed.path).replace("\\", "/")
         if decoded_path.startswith("//") or any(ord(char) < 32 for char in decoded_path):
@@ -127,7 +134,7 @@ class MediaURLValidator:
             parsed_addresses = tuple(ipaddress.ip_address(item) for item in addresses)
         except ValueError as exc:
             raise UnsafeMediaURLError("媒体地址域名返回了无效地址") from exc
-        if any(not address.is_global for address in parsed_addresses):
+        if any(not self._is_public_address(address) for address in parsed_addresses):
             raise UnsafeMediaURLError("媒体地址解析到了非公网地址") from None
         unique = sorted(set(parsed_addresses), key=lambda item: (item.version, int(item)))
         return ValidatedMediaTarget(
@@ -144,6 +151,27 @@ class MediaURLValidator:
     def _host_matches_suffix(host: str, suffix: str) -> bool:
         normalized = host.lower().rstrip(".")
         return normalized == suffix or normalized.endswith(f".{suffix}")
+
+    @staticmethod
+    def _is_public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+        if (
+            not address.is_global
+            or address.is_loopback
+            or address.is_link_local
+            or address.is_multicast
+            or address.is_private
+            or address.is_reserved
+            or address.is_unspecified
+        ):
+            return False
+        if isinstance(address, ipaddress.IPv6Address):
+            if address.is_site_local or any(address in network for network in _NAT64_PREFIXES):
+                return False
+            if address.ipv4_mapped is not None or address.sixtofour is not None:
+                return False
+            if address.teredo is not None:
+                return False
+        return True
 
     @staticmethod
     def _normalize_configured_suffix(value: str) -> str:

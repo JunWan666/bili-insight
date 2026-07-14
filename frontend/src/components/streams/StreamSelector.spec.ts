@@ -100,4 +100,46 @@ describe('StreamSelector', () => {
     expect(wrapper.emitted('verify')?.at(-1)).toEqual([['aac']])
     expect(verifyButton.text()).toContain('小范围验证')
   })
+
+  it('opens playback only for a selected stream with DASH preview metadata', async () => {
+    const playable: StreamCollection = {
+      ...streams,
+      videos: streams.videos.map((stream) => stream.id === 'h264'
+        ? { ...stream, mimeType: 'video/mp4', codecString: 'avc1.640032', previewSupported: true }
+        : stream),
+      audios: streams.audios.map((stream) => ({
+        ...stream,
+        mimeType: 'audio/mp4',
+        codecString: 'mp4a.40.2',
+        previewSupported: true,
+      })),
+    }
+    const wrapper = mount(StreamSelector, {
+      props: { streams: playable, preset: 'custom', selectedVideoId: 'h264', selectedAudioId: 'aac' },
+    })
+
+    const previewButton = wrapper.get('[data-testid="open-video-preview"]')
+    expect(previewButton.attributes('disabled')).toBeUndefined()
+    await previewButton.trigger('click')
+    expect(wrapper.emitted('preview')).toHaveLength(1)
+  })
+
+  it('keeps video preview available while clearly marking a video-only fallback', async () => {
+    const playableVideo: StreamCollection = {
+      ...streams,
+      videos: streams.videos.map((stream) => stream.id === 'h264'
+        ? { ...stream, mimeType: 'video/mp4', codecString: 'avc1.640032', previewSupported: true }
+        : stream),
+    }
+    const wrapper = mount(StreamSelector, {
+      props: { streams: playableVideo, preset: 'custom', selectedVideoId: 'h264', selectedAudioId: 'aac' },
+    })
+
+    const previewButton = wrapper.get('[data-testid="open-video-preview"]')
+    expect(previewButton.attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).toContain('所选音轨缺少在线预览信息')
+    expect(wrapper.text()).toContain('临时使用无音轨模式')
+    await previewButton.trigger('click')
+    expect(wrapper.emitted('preview')).toHaveLength(1)
+  })
 })

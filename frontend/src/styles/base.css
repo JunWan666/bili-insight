@@ -79,6 +79,12 @@ img { max-width: 100%; }
 .el-empty { --el-empty-fill-color-0: var(--surface-muted); }
 .el-table { --el-table-border-color: var(--line-soft); --el-table-header-bg-color: var(--surface-muted); --el-table-row-hover-bg-color: var(--brand-soft); }
 
+@media (min-width: 1200px) {
+  .el-button { min-height: 40px; }
+  .el-button--large { min-height: 46px; }
+  .el-table .el-button { min-height: 36px; }
+}
+
 @media (max-width: 767px) {
   .el-message { min-width: 0; width: calc(100vw - 24px); }
   .el-dialog { width: calc(100vw - 24px) !important; margin-top: max(5vh, env(safe-area-inset-top)) !important; }

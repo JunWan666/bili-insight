@@ -40,6 +40,8 @@ export interface TestApiState {
   remembered: boolean
   parseRequests: ParseRequestRecord[]
   streamVerificationRequests: Array<{ streamId: string; accessMode: string }>
+  previewRequests: Array<Record<string, unknown>>
+  previewDeletes: string[]
   downloadRequests: Array<Record<string, unknown>>
   downloadBatchRequests: Array<Array<Record<string, unknown>>>
   analysisRequests: Array<Record<string, unknown>>
@@ -187,6 +189,13 @@ function videoStream(
     verifiedAt: null,
     compatibleDevices: codec === 'H.264 / AVC' ? ['desktop', 'mobile', 'tv'] : ['modern-desktop', 'modern-mobile'],
     compatibilityNote,
+    mimeType: 'video/mp4',
+    codecString: codec === 'H.264 / AVC'
+      ? 'avc1.640028'
+      : codec === 'H.265 / HEVC'
+        ? 'hev1.1.6.L150.90'
+        : 'av01.0.08M.08',
+    previewSupported: true,
   }
 }
 
@@ -213,6 +222,9 @@ function audioStream(partId: string, id: string, bitrate: number): MediaStream {
     verifiedAt: null,
     compatibleDevices: ['desktop', 'mobile', 'tv'],
     compatibilityNote: '广泛兼容',
+    mimeType: 'audio/mp4',
+    codecString: 'mp4a.40.2',
+    previewSupported: true,
   }
 }
 
@@ -624,6 +636,8 @@ function initialState(): TestApiState {
     remembered: false,
     parseRequests: [],
     streamVerificationRequests: [],
+    previewRequests: [],
+    previewDeletes: [],
     downloadRequests: [],
     downloadBatchRequests: [],
     analysisRequests: [],
@@ -755,6 +769,27 @@ async function installApiRoutes(page: Page, state: TestApiState): Promise<void> 
         accessMode: typeof body.accessMode === 'string' ? body.accessMode : '',
       })
       await fulfillJson(route, { streamId, verifiedAt: fixedNow })
+      return
+    }
+    if (method === 'POST' && path === '/previews') {
+      state.previewRequests.push(jsonBody(request))
+      await fulfillJson(route, {
+        id: 'preview-e2e',
+        manifestUrl: `${apiPrefix}/previews/preview-e2e/manifest.mpd`,
+        expiresAt: '2026-07-14T08:30:00.000Z',
+        duration: 110,
+        video: { streamId: 'video-1080-avc', mimeType: 'video/mp4', codecString: 'avc1.640028' },
+        audio: { streamId: 'audio-aac-192', mimeType: 'audio/mp4', codecString: 'mp4a.40.2' },
+      }, 201)
+      return
+    }
+    if (method === 'GET' && path === '/previews/preview-e2e/manifest.mpd') {
+      await route.fulfill({ status: 503, contentType: 'application/dash+xml', body: '' })
+      return
+    }
+    if (method === 'DELETE' && path === '/previews/preview-e2e') {
+      state.previewDeletes.push('preview-e2e')
+      await route.fulfill({ status: 204, body: '' })
       return
     }
     if (method === 'GET' && path === '/videos') {

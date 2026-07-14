@@ -1,0 +1,109 @@
+{
+  "code": 0,
+  "message": "success",
+  "result": {
+    "season_id": 28747,
+    "media_id": 99028747,
+    "type": 4,
+    "show_season_type": "国创",
+    "title": "固定番剧解析样例",
+    "evaluate": "用于测试番剧 season 与 episode 统一解析的脱敏固定响应。",
+    "cover": "http://i0.hdslb.com/bfs/bangumi/pgc-fixed-cover.jpg",
+    "publish": {
+      "pub_time": "2020-07-25 20:00:00"
+    },
+    "up_info": {
+      "uname": "固定番剧出品方"
+    },
+    "rights": {
+      "copyright": "dujia",
+      "can_watch": 1,
+      "is_preview": 0,
+      "only_vip_download": 1
+    },
+    "payment": {
+      "price": "0.0"
+    },
+    "stat": {
+      "views": 987654,
+      "likes": 4321,
+      "favorites": 12345,
+      "danmakus": 67890,
+      "coins": 3456,
+      "share": 789
+    },
+    "styles": [
+      {"id": 1, "name": "动画"},
+      {"id": 2, "name": "剧情"}
+    ],
+    "areas": [
+      {"id": 2, "name": "中国大陆"}
+    ],
+    "episodes": [
+      {
+        "aid": 990000001,
+        "bvid": "BV1PGCTest01",
+        "cid": 1022370693,
+        "duration": 1203160,
+        "ep_id": 733316,
+        "id": 733316,
+        "title": "1",
+        "long_title": "固定第一集",
+        "show_title": "第 1 集 固定第一集",
+        "cover": "http://i0.hdslb.com/bfs/bangumi/pgc-fixed-ep1.jpg",
+        "pub_time": 1675566000,
+        "badge": ""
+      },
+      {
+        "aid": 990000002,
+        "bvid": "BV1PGCTest02",
+        "cid": 1022370694,
+        "duration": 1210400,
+        "ep_id": 733317,
+        "id": 733317,
+        "title": "2",
+        "long_title": "固定第二集",
+        "show_title": "第 2 集 固定第二集",
+        "cover": "http://i0.hdslb.com/bfs/bangumi/pgc-fixed-ep2.jpg",
+        "pub_time": 1676170800,
+        "badge": "会员"
+      }
+    ],
+    "section": [
+      {
+        "id": 9001,
+        "title": "特别篇",
+        "episodes": [
+          {
+            "aid": 990000003,
+            "bvid": "BV1PGCTest03",
+            "cid": 1022370999,
+            "duration": 305000,
+            "ep_id": 800001,
+            "id": 800001,
+            "title": "特别篇",
+            "long_title": "固定特别篇",
+            "show_title": "固定特别篇",
+            "cover": "http://i0.hdslb.com/bfs/bangumi/pgc-fixed-special.jpg",
+            "pub_time": 1676775600,
+            "badge": ""
+          },
+          {
+            "aid": 990000004,
+            "bvid": "BV1PGCTest04",
+            "cid": 1022371000,
+            "duration": 306000,
+            "ep_id": 800002,
+            "id": 800002,
+            "title": "SP2",
+            "long_title": "Second special",
+            "show_title": "Second special",
+            "cover": "http://i0.hdslb.com/bfs/bangumi/pgc-fixed-special-2.jpg",
+            "pub_time": 1676862000,
+            "badge": ""
+          }
+        ]
+      }
+    ]
+  }
+}

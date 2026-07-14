@@ -11,9 +11,9 @@ interface ErrorPayload {
 }
 
 const knownErrors: Record<string, { message: string; action: string }> = {
-  INVALID_LINK: { message: '无法识别该链接，请使用普通 BV/AV 视频链接', action: '返回首页修改链接' },
-  INVALID_VIDEO_URL: { message: '无法识别该链接，请使用普通 BV/AV 视频链接', action: '返回首页修改链接' },
-  UNSUPPORTED_CONTENT: { message: '当前仅支持普通投稿视频', action: '请更换为普通 BV/AV 视频链接' },
+  INVALID_LINK: { message: '无法识别该链接，请使用 BV/AV 投稿或 ss/ep 番剧链接', action: '返回首页修改链接' },
+  INVALID_VIDEO_URL: { message: '无法识别该链接，请使用 BV/AV 投稿或 ss/ep 番剧链接', action: '返回首页修改链接' },
+  UNSUPPORTED_CONTENT: { message: '当前不支持该内容类型', action: '请更换为普通投稿或番剧播放链接' },
   VIDEO_NOT_FOUND: { message: '视频不存在、已删除或当前不可见', action: '请检查链接或更换视频' },
   REGION_RESTRICTED: { message: '该视频在当前地区不可用', action: '请在 Bilibili 官方页面确认访问权限' },
   PERMISSION_DENIED: { message: '当前身份无权访问该视频', action: '校验 Cookie 或继续匿名使用' },

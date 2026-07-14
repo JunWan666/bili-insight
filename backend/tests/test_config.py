@@ -36,3 +36,10 @@ def test_cors_accepts_empty_comma_and_json_forms() -> None:
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
+
+
+def test_default_media_hosts_include_only_the_scoped_pgc_cdn_suffix() -> None:
+    suffixes = Settings().media_host_suffixes
+
+    assert "edge.mountaintoys.cn" in suffixes
+    assert "mountaintoys.cn" not in suffixes

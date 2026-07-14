@@ -94,6 +94,9 @@ class MediaStreamRead(CamelModel):
     quality_label: str
     codec: str
     container: str
+    mime_type: str | None = None
+    codec_string: str | None = None
+    preview_supported: bool = False
     width: int | None
     height: int | None
     fps: float | None

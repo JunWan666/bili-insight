@@ -27,6 +27,7 @@ import type {
   MediaStream,
   PageResult,
   ParsedVideoResult,
+  PreviewSession,
   StreamCollection,
   StreamVerificationResult,
   StorageStatus,
@@ -156,6 +157,8 @@ function normalizeVideo(value: unknown, context: UnknownRecord = {}): VideoDetai
 function normalizeStream(value: unknown, partId: string): MediaStream {
   const source = record(value)
   const compatibility = record(source.compatibility)
+  const mimeType = nullableString(source.mimeType ?? source.mime_type)
+  const codecString = nullableString(source.codecString ?? source.codec_string)
   const compatibilityNote =
     nullableString(source.compatibilityNote) ??
     nullableString(compatibility.note) ??
@@ -193,6 +196,11 @@ function normalizeStream(value: unknown, partId: string): MediaStream {
     verifiedAt: nullableString(source.verifiedAt),
     compatibleDevices: strings(source.compatibleDevices ?? compatibility.devices),
     compatibilityNote,
+    mimeType,
+    codecString,
+    previewSupported: source.previewSupported === true || Boolean(
+      mimeType && codecString && (source.initializationRange || source.initialization_range),
+    ),
   }
 }
 
@@ -217,6 +225,28 @@ export function normalizeStreamVerification(value: unknown): StreamVerificationR
   return {
     streamId: stringValue(source.streamId),
     verifiedAt: stringValue(source.verifiedAt),
+  }
+}
+
+export function normalizePreviewSession(value: unknown): PreviewSession {
+  const source = record(value)
+  const video = record(source.video)
+  const audio = record(source.audio)
+  return {
+    id: stringValue(source.id),
+    manifestUrl: stringValue(source.manifestUrl ?? source.manifest_url),
+    expiresAt: stringValue(source.expiresAt ?? source.expires_at),
+    duration: numberValue(source.duration),
+    video: {
+      streamId: stringValue(video.streamId ?? video.stream_id),
+      mimeType: stringValue(video.mimeType ?? video.mime_type),
+      codecString: stringValue(video.codecString ?? video.codec_string),
+    },
+    audio: source.audio == null ? null : {
+      streamId: stringValue(audio.streamId ?? audio.stream_id),
+      mimeType: stringValue(audio.mimeType ?? audio.mime_type),
+      codecString: stringValue(audio.codecString ?? audio.codec_string),
+    },
   }
 }
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from http.cookiejar import CookieJar
+from typing import Any
 
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -40,6 +42,8 @@ from app.schemas.video import (
     VideoStats,
 )
 from app.services.auth import AuthService
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +107,7 @@ class VideoService:
             video, metadata_cache_hit = await self._get_or_fetch_video(
                 reference, cookies=cookies, force_refresh=force_refresh
             )
-            part = self._select_part(video, reference.page_number)
+            part = self._select_part(video, reference)
             streams, stream_cache_hit = await self._get_or_fetch_streams(
                 video,
                 part,
@@ -122,10 +126,7 @@ class VideoService:
         return ParseVideoResponse(
             video=self._video_read(video),
             streams=self._streams_read(part.id, streams, stream_cache_hit, access),
-            normalized_url=(
-                f"https://www.bilibili.com/video/{video.bvid}/"
-                + (f"?p={part.page_number}" if part.page_number != 1 else "")
-            ),
+            normalized_url=reference.normalized_url,
             selected_part_id=part.id,
             source_time=datetime.now(UTC),
             cache_hit=metadata_cache_hit and stream_cache_hit,
@@ -233,15 +234,20 @@ class VideoService:
             )
             if selected is None:
                 raise self._not_found("分 P 记录不存在", "重新选择视频分 P")
-            value = f"https://www.bilibili.com/video/{video.bvid}/?p={selected.page_number}"
+            value = self._part_url(video, selected)
         return await self.parse(value, access_mode, force_refresh=True)
 
     async def resolve_stream(
-        self, stream_id: str, access_mode: AccessMode, *, verify: bool = True
+        self,
+        stream_id: str,
+        access_mode: AccessMode,
+        *,
+        verify: bool = True,
+        force_refresh: bool = False,
     ) -> ResolvedStream:
         now = datetime.now(UTC)
         cached = self._source_urls.get(stream_id)
-        if cached is not None and cached.expires_at > now:
+        if not force_refresh and cached is not None and cached.expires_at > now:
             async with self.session_factory() as session:
                 stream = await session.get(MediaStream, stream_id)
                 if stream is not None and self._context_allowed(stream.access_context, access_mode):
@@ -301,6 +307,7 @@ class VideoService:
             if verify:
                 await self.provider.verify_stream(selected.url, cookies)
                 stream.verified_at = now
+            self._apply_provider_stream(stream, selected)
             stream.fetched_at = now
             await session.commit()
             self._source_urls[stream.id] = CachedSource(
@@ -374,12 +381,36 @@ class VideoService:
     ) -> tuple[Video, bool]:
         cutoff = datetime.now(UTC) - timedelta(seconds=self.settings.metadata_cache_ttl_seconds)
         async with self.session_factory() as session:
-            statement = select(Video).options(selectinload(Video.parts))
-            if reference.bvid:
-                statement = statement.where(Video.bvid == reference.bvid)
+            existing: Video | None = None
+            if reference.episode_id is not None:
+                candidates = list(
+                    (
+                        await session.scalars(
+                            select(Video)
+                            .where(Video.provider == reference.provider)
+                            .options(selectinload(Video.parts))
+                        )
+                    ).all()
+                )
+                existing = next(
+                    (
+                        item
+                        for item in candidates
+                        if self._episode_cid(item, reference.episode_id) is not None
+                    ),
+                    None,
+                )
             else:
-                statement = statement.where(Video.aid == reference.aid)
-            existing = await session.scalar(statement)
+                statement = (
+                    select(Video)
+                    .where(Video.provider == reference.provider)
+                    .options(selectinload(Video.parts))
+                )
+                if reference.bvid:
+                    statement = statement.where(Video.bvid == reference.bvid)
+                else:
+                    statement = statement.where(Video.aid == reference.aid)
+                existing = await session.scalar(statement)
             if (
                 existing is not None
                 and not force_refresh
@@ -394,9 +425,18 @@ class VideoService:
         async with self.session_factory() as session:
             video = await session.scalar(
                 select(Video)
-                .where(or_(Video.bvid == source.bvid, Video.aid == source.aid))
+                .where(
+                    Video.provider == source.provider,
+                    or_(Video.bvid == source.bvid, Video.aid == source.aid),
+                )
                 .options(selectinload(Video.parts))
             )
+            raw_metadata = source.raw_metadata
+            if video is not None and source.provider == "bilibili_pgc":
+                raw_metadata = self._merge_pgc_raw_metadata(
+                    video.raw_metadata,
+                    source.raw_metadata,
+                )
             if video is None:
                 video = Video(
                     provider=source.provider,
@@ -411,7 +451,7 @@ class VideoService:
                     stats=source.stats,
                     tags=source.tags,
                     rights=source.rights,
-                    raw_metadata=source.raw_metadata,
+                    raw_metadata=raw_metadata,
                     parsed_at=datetime.now(UTC),
                     parts=[],
                 )
@@ -430,27 +470,38 @@ class VideoService:
                 video.stats = source.stats
                 video.tags = source.tags
                 video.rights = source.rights
-                video.raw_metadata = source.raw_metadata
+                video.raw_metadata = raw_metadata
                 video.parsed_at = datetime.now(UTC)
 
             existing_parts = {part.cid: part for part in video.parts}
             source_cids = {part.cid for part in source.parts}
+            preserved_section_cids = self._pgc_section_episode_cids(video.raw_metadata)
+            source_section_cids = self._pgc_section_episode_cids(source.raw_metadata)
+            source_cids.update(preserved_section_cids)
+            used_page_numbers = {part.page_number for part in video.parts}
+            next_section_page = max(used_page_numbers, default=0) + 1
             for old_part in list(video.parts):
                 if old_part.cid not in source_cids:
                     await session.delete(old_part)
             for source_part in source.parts:
                 part = existing_parts.get(source_part.cid)
                 if part is None:
+                    page_number = source_part.page_number
+                    if source_part.cid in source_section_cids and page_number in used_page_numbers:
+                        page_number = next_section_page
+                        next_section_page += 1
+                    used_page_numbers.add(page_number)
                     part = VideoPart(
                         video_id=video.id,
                         cid=source_part.cid,
-                        page_number=source_part.page_number,
+                        page_number=page_number,
                         title=source_part.title,
                         duration=source_part.duration,
                     )
                     session.add(part)
                 else:
-                    part.page_number = source_part.page_number
+                    if source_part.cid not in preserved_section_cids:
+                        part.page_number = source_part.page_number
                     part.title = source_part.title
                     part.duration = source_part.duration
             await session.commit()
@@ -490,14 +541,22 @@ class VideoService:
         provider_part = self._provider_part(part)
         anonymous_capabilities: set[tuple[object, ...]] = set()
         if context == AccessContext.AUTHENTICATED:
-            anonymous, _ = await self._get_or_fetch_streams(
-                video,
-                part,
-                context=AccessContext.ANONYMOUS,
-                cookies=None,
-                force_refresh=force_refresh,
-            )
-            anonymous_capabilities = {self._capability_key(item) for item in anonymous}
+            try:
+                anonymous, _ = await self._get_or_fetch_streams(
+                    video,
+                    part,
+                    context=AccessContext.ANONYMOUS,
+                    cookies=None,
+                    force_refresh=force_refresh,
+                )
+            except AppError as exc:
+                logger.info(
+                    "Anonymous capability baseline unavailable during authenticated parse: %s",
+                    exc.code.value,
+                    extra={"event": "anonymous_stream_baseline_unavailable"},
+                )
+            else:
+                anonymous_capabilities = {self._capability_key(item) for item in anonymous}
         provider_streams = await self.provider.get_streams(provider_video, provider_part, cookies)
         persisted = await self._persist_streams(
             part.id,
@@ -557,6 +616,12 @@ class VideoService:
                         quality_label=source.quality_label,
                         codec=source.codec,
                         container=source.container,
+                        mime_type=source.mime_type,
+                        codec_string=source.codec_string,
+                        init_range_start=source.init_range_start,
+                        init_range_end=source.init_range_end,
+                        index_range_start=source.index_range_start,
+                        index_range_end=source.index_range_end,
                         width=source.width,
                         height=source.height,
                         fps=source.fps,
@@ -578,6 +643,12 @@ class VideoService:
                     stream.quality_label = source.quality_label
                     stream.codec = source.codec
                     stream.container = source.container
+                    stream.mime_type = source.mime_type
+                    stream.codec_string = source.codec_string
+                    stream.init_range_start = source.init_range_start
+                    stream.init_range_end = source.init_range_end
+                    stream.index_range_start = source.index_range_start
+                    stream.index_range_end = source.index_range_end
                     stream.width = source.width
                     stream.height = source.height
                     stream.fps = source.fps
@@ -610,17 +681,143 @@ class VideoService:
         )
         return result
 
-    @staticmethod
-    def _select_part(video: Video, page_number: int) -> VideoPart:
-        part = next((item for item in video.parts if item.page_number == page_number), None)
+    @classmethod
+    def _select_part(cls, video: Video, reference: VideoReference) -> VideoPart:
+        selected_cid = (
+            cls._episode_cid(video, reference.episode_id)
+            if reference.episode_id is not None
+            else None
+        )
+        part = (
+            next((item for item in video.parts if item.cid == selected_cid), None)
+            if selected_cid is not None
+            else next(
+                (item for item in video.parts if item.page_number == reference.page_number),
+                None,
+            )
+        )
         if part is None:
             raise AppError(
                 ErrorCode.VALIDATION_ERROR,
-                "链接指定的分 P 不存在",
-                action="选择该视频已有的分 P",
+                "链接指定的分 P 或剧集不存在",
+                action="选择该视频当前已有的分 P 或剧集",
                 status_code=422,
             )
         return part
+
+    @classmethod
+    def _part_url(cls, video: Video, part: VideoPart) -> str:
+        if video.provider == "bilibili_pgc":
+            episode = cls._episode_metadata(video, cid=part.cid)
+            episode_id = episode.get("episodeId") if episode is not None else None
+            if isinstance(episode_id, int) and episode_id > 0:
+                return f"https://www.bilibili.com/bangumi/play/ep{episode_id}"
+            season_id = video.raw_metadata.get("seasonId")
+            if isinstance(season_id, int) and season_id > 0:
+                return f"https://www.bilibili.com/bangumi/play/ss{season_id}"
+            raise AppError(
+                ErrorCode.UPSTREAM_CHANGED,
+                "番剧定位信息不完整，暂时无法刷新",
+                action="返回首页重新解析该番剧链接",
+                status_code=502,
+            )
+        suffix = f"?p={part.page_number}" if part.page_number != 1 else ""
+        return f"https://www.bilibili.com/video/{video.bvid}/{suffix}"
+
+    @classmethod
+    def _episode_cid(cls, video: Video, episode_id: int) -> int | None:
+        episode = cls._episode_metadata(video, episode_id=episode_id)
+        cid = episode.get("cid") if episode is not None else None
+        return cid if isinstance(cid, int) and cid > 0 else None
+
+    @staticmethod
+    def _pgc_section_episode_cids(metadata: dict[str, Any]) -> set[int]:
+        episodes = metadata.get("episodes")
+        if not isinstance(episodes, list):
+            return set()
+        return {
+            cid
+            for item in episodes
+            if isinstance(item, dict) and item.get("sectionEpisode") is True
+            for cid in [item.get("cid")]
+            if isinstance(cid, int) and not isinstance(cid, bool) and cid > 0
+        }
+
+    @classmethod
+    def _merge_pgc_raw_metadata(
+        cls,
+        existing: dict[str, Any],
+        incoming: dict[str, Any],
+    ) -> dict[str, Any]:
+        if incoming.get("contentType") != "bangumi":
+            return incoming
+        incoming_episodes = incoming.get("episodes")
+        existing_episodes = existing.get("episodes")
+        if not isinstance(incoming_episodes, list) or not isinstance(existing_episodes, list):
+            return incoming
+
+        merged_episodes: list[dict[str, Any]] = []
+        seen_episode_ids: set[int] = set()
+        seen_cids: set[int] = set()
+        candidates = [
+            *(item for item in incoming_episodes if isinstance(item, dict)),
+            *(
+                item
+                for item in existing_episodes
+                if isinstance(item, dict) and item.get("sectionEpisode") is True
+            ),
+        ]
+        for item in candidates:
+            episode_id = item.get("episodeId")
+            cid = item.get("cid")
+            normalized_episode_id = (
+                episode_id
+                if isinstance(episode_id, int)
+                and not isinstance(episode_id, bool)
+                and episode_id > 0
+                else None
+            )
+            normalized_cid = (
+                cid if isinstance(cid, int) and not isinstance(cid, bool) and cid > 0 else None
+            )
+            if (
+                normalized_episode_id is not None and normalized_episode_id in seen_episode_ids
+            ) or (normalized_cid is not None and normalized_cid in seen_cids):
+                continue
+            if normalized_episode_id is not None:
+                seen_episode_ids.add(normalized_episode_id)
+            if normalized_cid is not None:
+                seen_cids.add(normalized_cid)
+            merged_episodes.append(item)
+
+        merged = dict(incoming)
+        merged["episodes"] = merged_episodes
+        return merged
+
+    @staticmethod
+    def _episode_metadata(
+        video: Video,
+        *,
+        episode_id: int | None = None,
+        cid: int | None = None,
+    ) -> dict[str, object] | None:
+        if video.provider != "bilibili_pgc" or video.raw_metadata.get("contentType") != "bangumi":
+            return None
+        episodes = video.raw_metadata.get("episodes")
+        if not isinstance(episodes, list):
+            return None
+        return next(
+            (
+                item
+                for item in episodes
+                if isinstance(item, dict)
+                and (
+                    (episode_id is not None and item.get("episodeId") == episode_id)
+                    or (cid is not None and item.get("cid") == cid)
+                )
+            ),
+            None,
+        )
 
     @classmethod
     def _video_read(cls, video: Video) -> VideoRead:
@@ -686,6 +883,17 @@ class VideoService:
 
     @staticmethod
     def _stream_read(stream: MediaStream) -> MediaStreamRead:
+        preview_supported = all(
+            value is not None
+            for value in (
+                stream.mime_type,
+                stream.codec_string,
+                stream.init_range_start,
+                stream.init_range_end,
+                stream.index_range_start,
+                stream.index_range_end,
+            )
+        )
         return MediaStreamRead(
             id=stream.id,
             kind=stream.kind,
@@ -693,6 +901,9 @@ class VideoService:
             quality_label=stream.quality_label,
             codec=stream.codec,
             container=stream.container,
+            mime_type=stream.mime_type,
+            codec_string=stream.codec_string,
+            preview_supported=preview_supported,
             width=stream.width,
             height=stream.height,
             fps=stream.fps,
@@ -707,6 +918,29 @@ class VideoService:
             verified_at=VideoService._as_utc_optional(stream.verified_at),
             compatibility=stream.compatibility,
         )
+
+    @staticmethod
+    def _apply_provider_stream(stream: MediaStream, source: ProviderStream) -> None:
+        stream.kind = source.kind
+        stream.quality_code = source.quality_code
+        stream.quality_label = source.quality_label
+        stream.codec = source.codec
+        stream.container = source.container
+        stream.mime_type = source.mime_type
+        stream.codec_string = source.codec_string
+        stream.init_range_start = source.init_range_start
+        stream.init_range_end = source.init_range_end
+        stream.index_range_start = source.index_range_start
+        stream.index_range_end = source.index_range_end
+        stream.width = source.width
+        stream.height = source.height
+        stream.fps = source.fps
+        stream.bitrate = source.bitrate
+        stream.hdr_type = source.hdr_type
+        stream.audio_channels = source.audio_channels
+        stream.sample_rate = source.sample_rate
+        stream.estimated_size = source.estimated_size
+        stream.compatibility = source.compatibility
 
     @staticmethod
     def _https_resource_url(value: str) -> str:

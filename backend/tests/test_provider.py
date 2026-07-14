@@ -76,6 +76,41 @@ async def test_normalize_url(
 
 
 @pytest.mark.parametrize(
+    ("value", "expected_season", "expected_episode", "expected_url"),
+    [
+        (
+            "https://www.bilibili.com/bangumi/play/ss28747?from_spmid=tracking",
+            28747,
+            None,
+            "https://www.bilibili.com/bangumi/play/ss28747",
+        ),
+        (
+            "https://m.bilibili.com/bangumi/play/ep733317?from_spmid=tracking",
+            None,
+            733317,
+            "https://www.bilibili.com/bangumi/play/ep733317",
+        ),
+        ("ss28747", 28747, None, "https://www.bilibili.com/bangumi/play/ss28747"),
+        ("ep733317", None, 733317, "https://www.bilibili.com/bangumi/play/ep733317"),
+    ],
+)
+async def test_normalize_bangumi_urls(
+    provider: BilibiliProvider,
+    value: str,
+    expected_season: int | None,
+    expected_episode: int | None,
+    expected_url: str,
+) -> None:
+    result = await provider.normalize_url(value)
+
+    assert result.provider == "bilibili_pgc"
+    assert result.season_id == expected_season
+    assert result.episode_id == expected_episode
+    assert result.normalized_url == expected_url
+    assert "from_spmid" not in result.normalized_url
+
+
+@pytest.mark.parametrize(
     "value",
     [
         "http://www.bilibili.com/video/BV1FYT5zkE1q",
@@ -143,6 +178,119 @@ async def test_authenticated_provider_adds_member_streams(
     )
 
 
+async def test_provider_parses_bangumi_season_episode_and_member_streams(
+    provider: BilibiliProvider,
+    valid_cookie_json: bytes,
+) -> None:
+    season_reference = await provider.normalize_url(
+        "https://www.bilibili.com/bangumi/play/ss28747?from_spmid=removed"
+    )
+    season = await provider.get_video(season_reference)
+
+    assert season.provider == "bilibili_pgc"
+    assert season.bvid == "SS28747"
+    assert season.aid == 28747
+    assert season.title == "固定番剧解析样例"
+    assert season.cover_url.startswith("https://")
+    assert season.owner_name == "固定番剧出品方"
+    assert season.duration == 2415
+    assert len(season.parts) == 2
+    assert season.parts[1].title == "2 固定第二集"
+    assert season.rights["contentType"] == "bangumi"
+    assert season.rights["isPremiumOnly"] is True
+    assert season.stats["views"] == 987654
+    assert season.tags == ["动画", "剧情", "中国大陆"]
+    assert set(season.raw_metadata) == {
+        "contentType",
+        "seasonId",
+        "mediaId",
+        "seasonType",
+        "seasonTypeName",
+        "episodes",
+    }
+
+    anonymous_streams = await provider.get_streams(season, season.parts[0])
+    assert {item.quality_code for item in anonymous_streams.video} == {32}
+    assert {item.codec for item in anonymous_streams.video} == {
+        "H.264/AVC",
+        "H.265/HEVC",
+    }
+    assert anonymous_streams.audio[0].codec == "AAC"
+    assert anonymous_streams.video[0].mime_type == "video/mp4"
+    assert anonymous_streams.video[0].codec_string == "avc1.64001E"
+    assert anonymous_streams.video[0].init_range_start == 0
+    assert anonymous_streams.video[0].index_range_end == 1_999
+    assert anonymous_streams.audio[0].mime_type == "audio/mp4"
+
+    parsed = CookieFileParser(max_bytes=1_048_576, max_items=100).parse(valid_cookie_json)
+    authenticated_streams = await provider.get_streams(season, season.parts[0], parsed.jar)
+    premium_stream = next(item for item in authenticated_streams.video if item.quality_code == 120)
+    assert (premium_stream.width, premium_stream.height) == (3840, 2160)
+    assert premium_stream.codec == "H.265/HEVC"
+    assert premium_stream.access_requirement == StreamAccessRequirement.PREMIUM
+    assert premium_stream.codec_string == "hev1.2.4.L153.B0"
+    assert premium_stream.init_range_end == 1_099
+
+    episode_reference = await provider.normalize_url(
+        "https://www.bilibili.com/bangumi/play/ep733317"
+    )
+    episode_season = await provider.get_video(episode_reference)
+    assert len(episode_season.parts) == 2
+    assert any(item.get("episodeId") == 733317 for item in episode_season.raw_metadata["episodes"])
+
+    special_reference = await provider.normalize_url("ep800001")
+    special_season = await provider.get_video(special_reference)
+    assert len(special_season.parts) == 3
+    special_metadata = next(
+        item for item in special_season.raw_metadata["episodes"] if item.get("episodeId") == 800001
+    )
+    assert special_metadata["sectionEpisode"] is True
+    assert special_season.parts[-1].title == "特别篇 固定特别篇"
+
+    subtitles = await provider.get_subtitles(season, season.parts[0])
+    assert subtitles[0].language == "zh-CN"
+
+
+async def test_provider_normalizes_bangumi_preview_and_malformed_payloads(
+    settings: Settings,
+    upstream: UpstreamFixtureServer,
+) -> None:
+    def preview_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/pgc/player/web/playurl":
+            return httpx.Response(
+                200,
+                json={"code": 0, "result": {"code": 0, "is_preview": 1}},
+                request=request,
+            )
+        return upstream.handle(request)
+
+    preview_provider = BilibiliProvider(
+        settings,
+        transport=httpx.MockTransport(preview_handler),
+        media_resolver=public_media_resolver,
+    )
+    reference = await preview_provider.normalize_url("ss28747")
+    video = await preview_provider.get_video(reference)
+    with pytest.raises(AppError) as preview:
+        await preview_provider.get_streams(video, video.parts[0])
+    assert preview.value.code == ErrorCode.AUTH_REQUIRED
+    assert preview.value.status_code == 401
+
+    malformed_provider = BilibiliProvider(
+        settings,
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                200,
+                json={"code": 0, "result": {"season_id": 28747, "title": "缺少剧集"}},
+                request=request,
+            )
+        ),
+    )
+    with pytest.raises(AppError) as malformed:
+        await malformed_provider.get_video(reference)
+    assert malformed.value.code == ErrorCode.UPSTREAM_CHANGED
+
+
 async def test_verify_stream_rejects_non_bilibili_host(provider: BilibiliProvider) -> None:
     with pytest.raises(AppError) as caught:
         await provider.verify_stream("https://127.0.0.1/private")
@@ -153,6 +301,27 @@ async def test_verify_stream_accepts_official_bilivideo_cn_cdn(
     provider: BilibiliProvider,
 ) -> None:
     await provider.verify_stream("https://sample.mcdn.bilivideo.cn/video/sample.m4s")
+
+
+async def test_verify_stream_accepts_only_the_scoped_pgc_cdn_and_sends_no_cookie(
+    provider: BilibiliProvider,
+    upstream: UpstreamFixtureServer,
+    valid_cookie_json: bytes,
+) -> None:
+    parsed = CookieFileParser(max_bytes=1_048_576, max_items=100).parse(valid_cookie_json)
+    await provider.verify_stream(
+        "https://vu5bt87a.edge.mountaintoys.cn:4483/video/sample.m4s",
+        parsed.jar,
+    )
+    assert upstream.cookie_headers[-1][1] == ""
+
+    with pytest.raises(AppError) as sibling:
+        await provider.verify_stream("https://edge.mountaintoys.cn.evil.example/sample.m4s")
+    assert sibling.value.code == ErrorCode.UPSTREAM_CHANGED
+
+    with pytest.raises(AppError) as broad_parent:
+        await provider.verify_stream("https://unrelated.mountaintoys.cn/sample.m4s")
+    assert broad_parent.value.code == ErrorCode.UPSTREAM_CHANGED
 
 
 async def test_verify_stream_rejects_private_dns_answers_before_request(
@@ -333,6 +502,22 @@ def test_provider_accepts_known_mcdn_tls_port_and_rejects_other_ports(
         "https://edge.mcdn.bilivideo.cn:8080/video/sample.m4s",
         "https://cdn-a.bilivideo.com:8082/video/sample.m4s",
         "https://edge.mcdn.bilivideo.cn:invalid/video/sample.m4s",
+    ):
+        with pytest.raises(AppError) as caught:
+            provider._validate_resource_url(url)
+        assert caught.value.code == ErrorCode.UPSTREAM_CHANGED
+
+
+def test_provider_accepts_current_pgc_cdn_tls_port_only_for_scoped_host(
+    provider: BilibiliProvider,
+) -> None:
+    provider._validate_resource_url(
+        "https://vu5bt87a.edge.mountaintoys.cn:4483/video/sample.m4s?deadline=1"
+    )
+    for url in (
+        "https://unrelated.mountaintoys.cn:4483/video/sample.m4s",
+        "https://edge.mountaintoys.cn.evil.example:4483/video/sample.m4s",
+        "https://vu5bt87a.edge.mountaintoys.cn:4484/video/sample.m4s",
     ):
         with pytest.raises(AppError) as caught:
             provider._validate_resource_url(url)

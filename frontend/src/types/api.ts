@@ -97,6 +97,9 @@ export interface MediaStream {
   verifiedAt: string | null
   compatibleDevices: string[]
   compatibilityNote: string | null
+  mimeType?: string | null
+  codecString?: string | null
+  previewSupported?: boolean
 }
 
 export interface StreamCollection {
@@ -111,6 +114,27 @@ export interface StreamCollection {
 export interface StreamVerificationResult {
   streamId: string
   verifiedAt: string
+}
+
+export interface PreviewTrack {
+  streamId: string
+  mimeType: string
+  codecString: string
+}
+
+export interface PreviewSession {
+  id: string
+  manifestUrl: string
+  expiresAt: string
+  duration: number
+  video: PreviewTrack
+  audio: PreviewTrack | null
+}
+
+export interface CreatePreviewRequest {
+  videoStreamId: string
+  audioStreamId: string | null
+  accessMode: Exclude<AccessMode, 'auto'>
 }
 
 export type DownloadPreset = 'best_quality' | 'best_compatibility' | 'smallest' | 'audio_only' | 'custom'

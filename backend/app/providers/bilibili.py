@@ -33,9 +33,16 @@ logger = logging.getLogger(__name__)
 
 _BVID = re.compile(r"^BV[0-9A-Za-z]{10}$", re.IGNORECASE)
 _AID = re.compile(r"^av([1-9][0-9]{0,19})$", re.IGNORECASE)
+_SEASON = re.compile(r"^ss([1-9][0-9]{0,18})$", re.IGNORECASE)
+_EPISODE = re.compile(r"^ep([1-9][0-9]{0,18})$", re.IGNORECASE)
 _VIDEO_PATH = re.compile(r"^/video/(BV[0-9A-Za-z]{10}|av[1-9][0-9]{0,19})/?$", re.IGNORECASE)
+_BANGUMI_PATH = re.compile(r"^/bangumi/play/(ss|ep)([1-9][0-9]{0,18})/?$", re.IGNORECASE)
 _INPUT_HOSTS = frozenset({"bilibili.com", "www.bilibili.com", "m.bilibili.com"})
 _MAX_AID = (1 << 63) - 1
+_DASH_BYTE_RANGE = re.compile(r"^(0|[1-9][0-9]*)-(0|[1-9][0-9]*)$")
+_MAX_DASH_METADATA_OFFSET = 64 * 1024 * 1024
+_PGC_CDN_HTTPS_PORT = 4483
+_PGC_CDN_SUFFIX = "edge.mountaintoys.cn"
 
 _VIEW_API = "https://api.bilibili.com/x/web-interface/view"
 _TAGS_API = "https://api.bilibili.com/x/tag/archive/tags"
@@ -43,6 +50,8 @@ _PLAYURL_API = "https://api.bilibili.com/x/player/playurl"
 _PLAYER_API = "https://api.bilibili.com/x/player/v2"
 _NAV_API = "https://api.bilibili.com/x/web-interface/nav"
 _DANMAKU_API = "https://api.bilibili.com/x/v1/dm/list.so"
+_PGC_SEASON_API = "https://api.bilibili.com/pgc/view/web/season"
+_PGC_PLAYURL_API = "https://api.bilibili.com/pgc/player/web/playurl"
 
 _QUALITY_LABELS = {
     6: "240P",
@@ -64,6 +73,7 @@ class BilibiliProvider:
     """Strict adapter around Bilibili's public web APIs."""
 
     provider_name = "bilibili"
+    pgc_provider_name = "bilibili_pgc"
 
     def __init__(
         self,
@@ -111,6 +121,8 @@ class BilibiliProvider:
 
         page_number = 1
         identifier = raw
+        season_id: int | None = None
+        episode_id: int | None = None
         if "://" in raw:
             parsed = urlsplit(raw)
             if parsed.scheme.lower() != "https":
@@ -123,24 +135,61 @@ class BilibiliProvider:
                     raise AppError(
                         ErrorCode.UNSUPPORTED_CONTENT,
                         "当前版本暂不支持短链接",
-                        action="在 Bilibili 页面复制普通 BV/AV 视频链接后重试",
+                        action="在 Bilibili 页面复制完整的视频或番剧链接后重试",
                     )
                 raise self._invalid_link()
             path_match = _VIDEO_PATH.fullmatch(parsed.path)
-            if path_match is None:
+            bangumi_match = _BANGUMI_PATH.fullmatch(parsed.path)
+            if path_match is not None:
+                identifier = path_match.group(1)
+            elif bangumi_match is not None:
+                path_content_id = int(bangumi_match.group(2))
+                if path_content_id > _MAX_AID:
+                    raise self._invalid_link()
+                if bangumi_match.group(1).lower() == "ss":
+                    season_id = path_content_id
+                    identifier = f"ss{path_content_id}"
+                else:
+                    episode_id = path_content_id
+                    identifier = f"ep{path_content_id}"
+            else:
                 raise AppError(
                     ErrorCode.UNSUPPORTED_CONTENT,
-                    "当前仅支持普通 BV/AV 投稿视频",
-                    action="请输入 bilibili.com/video/BV... 或 AV... 链接",
+                    "当前支持普通 BV/AV 投稿视频与番剧 ss/ep 链接",
+                    action="请输入 bilibili.com/video/... 或 bilibili.com/bangumi/play/... 链接",
                 )
-            identifier = path_match.group(1)
-            query = parse_qs(parsed.query, keep_blank_values=True)
-            if "p" in query:
-                if len(query["p"]) != 1 or not query["p"][0].isdigit():
-                    raise self._invalid_link()
-                page_number = int(query["p"][0])
-                if not 1 <= page_number <= 10_000:
-                    raise self._invalid_link()
+            if path_match is not None:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                if "p" in query:
+                    if len(query["p"]) != 1 or not query["p"][0].isdigit():
+                        raise self._invalid_link()
+                    page_number = int(query["p"][0])
+                    if not 1 <= page_number <= 10_000:
+                        raise self._invalid_link()
+
+        if season_id is None and episode_id is None:
+            season_match = _SEASON.fullmatch(identifier)
+            episode_match = _EPISODE.fullmatch(identifier)
+            if season_match is not None:
+                season_id = int(season_match.group(1))
+            elif episode_match is not None:
+                episode_id = int(episode_match.group(1))
+
+        if season_id is not None or episode_id is not None:
+            resolved_content_id = season_id if season_id is not None else episode_id
+            prefix = "ss" if season_id is not None else "ep"
+            assert resolved_content_id is not None
+            return VideoReference(
+                bvid=f"{prefix.upper()}{resolved_content_id}",
+                aid=resolved_content_id,
+                page_number=1,
+                normalized_url=(
+                    f"https://www.bilibili.com/bangumi/play/{prefix}{resolved_content_id}"
+                ),
+                provider=self.pgc_provider_name,
+                season_id=season_id,
+                episode_id=episode_id,
+            )
 
         bvid: str | None = None
         aid: int | None = None
@@ -161,11 +210,16 @@ class BilibiliProvider:
             aid=aid,
             page_number=page_number,
             normalized_url=f"https://www.bilibili.com/video/{normalized_identifier}/{suffix}",
+            provider=self.provider_name,
         )
 
     async def get_video(
         self, reference: VideoReference, cookies: CookieJar | None = None
     ) -> ProviderVideo:
+        if reference.provider == self.pgc_provider_name:
+            return await self._get_pgc_video(reference, cookies)
+        if reference.provider != self.provider_name:
+            raise self._upstream_changed()
         params = {"bvid": reference.bvid} if reference.bvid else {"aid": reference.aid}
         response = await self._request_json(_VIEW_API, params=params, cookies=cookies)
         data = self._response_data(response)
@@ -208,23 +262,88 @@ class BilibiliProvider:
             raw_metadata=video.raw_metadata,
         )
 
+    async def _get_pgc_video(
+        self, reference: VideoReference, cookies: CookieJar | None
+    ) -> ProviderVideo:
+        if reference.season_id is not None:
+            params: dict[str, Any] = {"season_id": reference.season_id}
+        elif reference.episode_id is not None:
+            params = {"ep_id": reference.episode_id}
+        else:
+            raise self._upstream_changed()
+        response = await self._request_json(
+            _PGC_SEASON_API,
+            params=params,
+            cookies=cookies,
+            referer=reference.normalized_url,
+        )
+        data = self._response_result(response)
+        return self._parse_pgc_video(data, selected_episode_id=reference.episode_id)
+
     async def get_streams(
         self, video: ProviderVideo, part: ProviderPart, cookies: CookieJar | None = None
     ) -> ProviderStreams:
-        payload = await self._request_json(
-            _PLAYURL_API,
-            params={
-                "bvid": video.bvid,
+        if video.provider == self.pgc_provider_name:
+            episode = self._pgc_episode(video, part)
+            params: dict[str, Any] = {
+                "ep_id": episode["episodeId"],
                 "cid": part.cid,
                 "qn": 127,
                 "fnver": 0,
                 "fnval": 4048,
                 "fourk": 1,
-            },
-            cookies=cookies,
-            referer=f"https://www.bilibili.com/video/{video.bvid}/?p={part.page_number}",
-        )
-        data = self._response_data(payload)
+            }
+            episode_bvid = episode.get("bvid")
+            episode_aid = episode.get("aid")
+            if isinstance(episode_bvid, str) and episode_bvid:
+                params["bvid"] = episode_bvid
+            elif isinstance(episode_aid, int):
+                params["avid"] = episode_aid
+            payload = await self._request_json(
+                _PGC_PLAYURL_API,
+                params=params,
+                cookies=cookies,
+                referer=self._part_referer(video, part),
+            )
+            data = self._response_result(payload)
+            nested_code = self._optional_int(data.get("code"))
+            if nested_code not in (None, 0):
+                self._raise_for_provider_code({"code": nested_code})
+            if self._truthy(data.get("is_preview")):
+                raise AppError(
+                    ErrorCode.AUTH_REQUIRED if cookies is None else ErrorCode.PERMISSION_DENIED,
+                    "当前剧集仅返回试看流，无法作为完整媒体处理",
+                    action=(
+                        "上传并校验有权限的 Cookie 后重试"
+                        if cookies is None
+                        else "在 Bilibili 官方页面确认当前账号的观看权益"
+                    ),
+                    status_code=(
+                        status.HTTP_401_UNAUTHORIZED
+                        if cookies is None
+                        else status.HTTP_403_FORBIDDEN
+                    ),
+                )
+        elif video.provider == self.provider_name:
+            payload = await self._request_json(
+                _PLAYURL_API,
+                params={
+                    "bvid": video.bvid,
+                    "cid": part.cid,
+                    "qn": 127,
+                    "fnver": 0,
+                    "fnval": 4048,
+                    "fourk": 1,
+                },
+                cookies=cookies,
+                referer=self._part_referer(video, part),
+            )
+            data = self._response_data(payload)
+        else:
+            raise self._upstream_changed()
+        return self._parse_streams(data, part)
+
+    def _parse_streams(self, data: Any, part: ProviderPart) -> ProviderStreams:
         if not isinstance(data, dict):
             raise self._upstream_changed()
         dash = data.get("dash")
@@ -290,11 +409,26 @@ class BilibiliProvider:
     async def get_subtitles(
         self, video: ProviderVideo, part: ProviderPart, cookies: CookieJar | None = None
     ) -> list[ProviderSubtitle]:
+        params: dict[str, Any] = {"cid": part.cid}
+        if video.provider == self.pgc_provider_name:
+            episode = self._pgc_episode(video, part)
+            episode_bvid = episode.get("bvid")
+            episode_aid = episode.get("aid")
+            if isinstance(episode_bvid, str) and episode_bvid:
+                params["bvid"] = episode_bvid
+            elif isinstance(episode_aid, int):
+                params["aid"] = episode_aid
+            else:
+                raise self._upstream_changed()
+        elif video.provider == self.provider_name:
+            params["bvid"] = video.bvid
+        else:
+            raise self._upstream_changed()
         payload = await self._request_json(
             _PLAYER_API,
-            params={"bvid": video.bvid, "cid": part.cid},
+            params=params,
             cookies=cookies,
-            referer=f"https://www.bilibili.com/video/{video.bvid}/?p={part.page_number}",
+            referer=self._part_referer(video, part),
         )
         data = self._response_data(payload)
         if not isinstance(data, dict):
@@ -329,7 +463,7 @@ class BilibiliProvider:
             _DANMAKU_API,
             params={"oid": part.cid},
             maximum_bytes=min(self.settings.upstream_max_response_bytes, 8 * 1024 * 1024),
-            referer=f"https://www.bilibili.com/video/{video.bvid}/?p={part.page_number}",
+            referer=self._part_referer(video, part),
         )
         self._validate_danmaku_xml(payload)
         return payload
@@ -630,6 +764,274 @@ class BilibiliProvider:
             raw_metadata=data,
         )
 
+    def _parse_pgc_video(self, data: Any, *, selected_episode_id: int | None) -> ProviderVideo:
+        if not isinstance(data, dict):
+            raise self._upstream_changed()
+        season_id = self._optional_int(data.get("season_id"))
+        title = data.get("title")
+        cover = data.get("cover")
+        if season_id is None or season_id <= 0 or not isinstance(title, str):
+            raise self._upstream_changed()
+        if not isinstance(cover, str) or not cover:
+            raise self._upstream_changed()
+
+        episode_items = self._pgc_episode_items(data, selected_episode_id)
+        parts: list[ProviderPart] = []
+        safe_episodes: list[dict[str, Any]] = []
+        for page_number, item in enumerate(episode_items, start=1):
+            episode_id = self._optional_int(item.get("ep_id", item.get("id")))
+            cid = self._optional_int(item.get("cid"))
+            if episode_id is None or episode_id <= 0 or cid is None or cid <= 0:
+                continue
+            duration = self._pgc_duration_seconds(item.get("duration"))
+            short_title = str(item.get("title") or "").strip()
+            long_title = str(item.get("long_title") or "").strip()
+            show_title = str(item.get("show_title") or "").strip()
+            part_title = " ".join(value for value in (short_title, long_title) if value)
+            part_title = part_title or show_title or f"第 {page_number} 集"
+            episode_bvid = item.get("bvid")
+            if not isinstance(episode_bvid, str) or not _BVID.fullmatch(episode_bvid):
+                episode_bvid = None
+            episode_aid = self._optional_int(item.get("aid"))
+            if episode_aid is not None and not 0 < episode_aid <= _MAX_AID:
+                episode_aid = None
+            badge_info = item.get("badge_info")
+            badge = item.get("badge") if isinstance(item.get("badge"), str) else ""
+            if isinstance(badge_info, dict) and isinstance(badge_info.get("text"), str):
+                badge = str(badge_info["text"])
+            episode_cover = item.get("cover")
+            safe_episodes.append(
+                {
+                    "episodeId": episode_id,
+                    "cid": cid,
+                    "aid": episode_aid,
+                    "bvid": episode_bvid,
+                    "pageNumber": page_number,
+                    "title": part_title,
+                    "duration": duration,
+                    "coverUrl": (
+                        self._absolute_https_url(episode_cover)
+                        if isinstance(episode_cover, str) and episode_cover
+                        else None
+                    ),
+                    "publishedAt": self._optional_int(item.get("pub_time")),
+                    "badge": badge,
+                    "sectionEpisode": self._truthy(item.get("_bili_insight_section_episode")),
+                }
+            )
+            parts.append(
+                ProviderPart(
+                    cid=cid,
+                    page_number=page_number,
+                    title=part_title,
+                    duration=duration,
+                )
+            )
+        if not parts:
+            raise self._upstream_changed()
+        if selected_episode_id is not None and not any(
+            item["episodeId"] == selected_episode_id for item in safe_episodes
+        ):
+            raise AppError(
+                ErrorCode.VIDEO_NOT_FOUND,
+                "剧集不存在、已删除或当前不可见",
+                action="确认 ep 链接后重试，或在官方番剧页面选择其他剧集",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        stat = cast(dict[str, Any], data.get("stat") if isinstance(data.get("stat"), dict) else {})
+        up_info = cast(
+            dict[str, Any], data.get("up_info") if isinstance(data.get("up_info"), dict) else {}
+        )
+        publish = cast(
+            dict[str, Any], data.get("publish") if isinstance(data.get("publish"), dict) else {}
+        )
+        season_rights = cast(
+            dict[str, Any], data.get("rights") if isinstance(data.get("rights"), dict) else {}
+        )
+        payment = cast(
+            dict[str, Any], data.get("payment") if isinstance(data.get("payment"), dict) else {}
+        )
+        price = payment.get("price")
+        try:
+            is_paid = float(price) > 0 if isinstance(price, str | int | float) else False
+        except ValueError:
+            is_paid = False
+        badges = [str(item.get("badge") or "") for item in safe_episodes]
+        is_premium_only = any("会员" in badge or "vip" in badge.casefold() for badge in badges)
+        copyright_value = season_rights.get("copyright")
+        copyright_label = (
+            {"dujia": "独家", "bilibili": "哔哩哔哩"}.get(copyright_value, copyright_value)
+            if isinstance(copyright_value, str)
+            else None
+        )
+        tags: list[str] = []
+        for collection_name in ("styles", "areas"):
+            collection = data.get(collection_name)
+            if not isinstance(collection, list):
+                continue
+            for item in collection:
+                if isinstance(item, dict) and isinstance(item.get("name"), str):
+                    name = str(item["name"]).strip()
+                    if name and name not in tags:
+                        tags.append(name)
+
+        published_at = self._parse_pgc_datetime(publish.get("pub_time"))
+        media_id = self._optional_int(data.get("media_id"))
+        raw_metadata = {
+            "contentType": "bangumi",
+            "seasonId": season_id,
+            "mediaId": media_id,
+            "seasonType": self._optional_int(data.get("type")),
+            "seasonTypeName": (
+                str(data["show_season_type"])
+                if isinstance(data.get("show_season_type"), str)
+                else None
+            ),
+            "episodes": safe_episodes,
+        }
+        return ProviderVideo(
+            provider=self.pgc_provider_name,
+            bvid=f"SS{season_id}",
+            aid=season_id,
+            title=title,
+            description=str(data.get("evaluate") or ""),
+            cover_url=self._absolute_https_url(cover),
+            owner_name=str(up_info.get("uname") or "哔哩哔哩番剧"),
+            duration=sum(part.duration for part in parts),
+            published_at=published_at,
+            stats={
+                "views": self._optional_int(stat.get("views")),
+                "likes": self._optional_int(stat.get("likes")),
+                "favorites": self._optional_int(stat.get("favorites", stat.get("favorite"))),
+                "danmaku": self._optional_int(stat.get("danmakus")),
+                "coins": self._optional_int(stat.get("coins")),
+                "shares": self._optional_int(stat.get("share")),
+            },
+            tags=tags,
+            rights={
+                "copyright": copyright_label,
+                "copyrightCode": None,
+                "isPaid": is_paid,
+                "isPremiumOnly": is_premium_only,
+                "contentType": "bangumi",
+                "seasonId": season_id,
+                "mediaId": media_id,
+            },
+            parts=parts,
+            raw_metadata=raw_metadata,
+        )
+
+    @classmethod
+    def _pgc_episode_items(
+        cls, data: dict[str, Any], selected_episode_id: int | None
+    ) -> list[dict[str, Any]]:
+        raw_episodes = data.get("episodes")
+        episodes = (
+            [item for item in raw_episodes if isinstance(item, dict)]
+            if isinstance(raw_episodes, list)
+            else []
+        )
+        if selected_episode_id is not None and not any(
+            cls._optional_int(item.get("ep_id", item.get("id"))) == selected_episode_id
+            for item in episodes
+        ):
+            sections = data.get("section")
+            if isinstance(sections, list):
+                for section in sections:
+                    if not isinstance(section, dict) or not isinstance(
+                        section.get("episodes"), list
+                    ):
+                        continue
+                    selected = next(
+                        (
+                            item
+                            for item in section["episodes"]
+                            if isinstance(item, dict)
+                            and cls._optional_int(item.get("ep_id", item.get("id")))
+                            == selected_episode_id
+                        ),
+                        None,
+                    )
+                    if selected is not None:
+                        episodes.append({**selected, "_bili_insight_section_episode": True})
+                        break
+        if not episodes:
+            sections = data.get("section")
+            if isinstance(sections, list):
+                for section in sections:
+                    if isinstance(section, dict) and isinstance(section.get("episodes"), list):
+                        episodes.extend(
+                            {**item, "_bili_insight_section_episode": True}
+                            for item in section["episodes"]
+                            if isinstance(item, dict)
+                        )
+        deduplicated: list[dict[str, Any]] = []
+        seen_episode_ids: set[int] = set()
+        seen_cids: set[int] = set()
+        for item in episodes:
+            episode_id = cls._optional_int(item.get("ep_id", item.get("id")))
+            cid = cls._optional_int(item.get("cid"))
+            if (episode_id is not None and episode_id in seen_episode_ids) or (
+                cid is not None and cid in seen_cids
+            ):
+                continue
+            if episode_id is not None:
+                seen_episode_ids.add(episode_id)
+            if cid is not None:
+                seen_cids.add(cid)
+            deduplicated.append(item)
+        return deduplicated
+
+    @staticmethod
+    def _pgc_duration_seconds(value: Any) -> int:
+        duration = BilibiliProvider._optional_int(value)
+        if duration is None or duration <= 0:
+            return 0
+        return math.ceil(duration / 1_000) if duration > 10_000 else duration
+
+    @staticmethod
+    def _parse_pgc_datetime(value: Any) -> datetime | None:
+        timestamp = BilibiliProvider._optional_int(value)
+        if timestamp is not None and timestamp > 0:
+            try:
+                return datetime.fromtimestamp(timestamp, tz=UTC)
+            except (OSError, OverflowError, ValueError):
+                return None
+        if not isinstance(value, str) or not value.strip():
+            return None
+        try:
+            parsed = datetime.strptime(value.strip(), "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return None
+        return parsed.replace(tzinfo=UTC)
+
+    @classmethod
+    def _pgc_episode(cls, video: ProviderVideo, part: ProviderPart) -> dict[str, Any]:
+        if video.raw_metadata.get("contentType") != "bangumi":
+            raise cls._upstream_changed()
+        episodes = video.raw_metadata.get("episodes")
+        if not isinstance(episodes, list):
+            raise cls._upstream_changed()
+        episode = next(
+            (
+                item
+                for item in episodes
+                if isinstance(item, dict) and cls._optional_int(item.get("cid")) == part.cid
+            ),
+            None,
+        )
+        if episode is None or cls._optional_int(episode.get("episodeId")) is None:
+            raise cls._upstream_changed()
+        return episode
+
+    @classmethod
+    def _part_referer(cls, video: ProviderVideo, part: ProviderPart) -> str:
+        if video.provider == cls.pgc_provider_name:
+            episode = cls._pgc_episode(video, part)
+            return f"https://www.bilibili.com/bangumi/play/ep{episode['episodeId']}"
+        return f"https://www.bilibili.com/video/{video.bvid}/?p={part.page_number}"
+
     def _parse_stream(
         self,
         item: dict[str, Any],
@@ -662,6 +1064,14 @@ class BilibiliProvider:
         estimated_size = math.ceil(bitrate * max(duration, 0) / 8) if bitrate is not None else None
         mime_type = str(item.get("mimeType", item.get("mime_type", "application/octet-stream")))
         container = mime_type.partition("/")[2].partition(";")[0] or "unknown"
+        segment_base = item.get("segmentBase", item.get("segment_base"))
+        initialization_range: tuple[int, int] | None = None
+        index_range: tuple[int, int] | None = None
+        if isinstance(segment_base, dict):
+            initialization_range = self._dash_byte_range(segment_base.get("initialization"))
+            index_range = self._dash_byte_range(
+                segment_base.get("indexRange", segment_base.get("index_range"))
+            )
         width = self._optional_int(item.get("width")) if kind == StreamKind.VIDEO else None
         height = self._optional_int(item.get("height")) if kind == StreamKind.VIDEO else None
         frame_rate = item.get("frameRate", item.get("frame_rate"))
@@ -696,8 +1106,27 @@ class BilibiliProvider:
             ),
             compatibility=self._compatibility(codec),
             url=url,
+            mime_type=mime_type if len(mime_type) <= 64 else None,
+            codec_string=raw_codec if len(raw_codec) <= 128 else None,
+            init_range_start=initialization_range[0] if initialization_range else None,
+            init_range_end=initialization_range[1] if initialization_range else None,
+            index_range_start=index_range[0] if index_range else None,
+            index_range_end=index_range[1] if index_range else None,
             backup_urls=tuple(backup_urls),
         )
+
+    @staticmethod
+    def _dash_byte_range(value: Any) -> tuple[int, int] | None:
+        if not isinstance(value, str) or len(value) > 64:
+            return None
+        match = _DASH_BYTE_RANGE.fullmatch(value.strip())
+        if match is None:
+            return None
+        start = int(match.group(1))
+        end = int(match.group(2))
+        if end < start or end > _MAX_DASH_METADATA_OFFSET:
+            return None
+        return start, end
 
     def _validate_resource_url(self, url: str, *, extra_suffixes: tuple[str, ...] = ()) -> None:
         parsed = urlsplit(url)
@@ -712,7 +1141,11 @@ class BilibiliProvider:
         if not any(host == suffix or host.endswith(f".{suffix}") for suffix in suffixes):
             raise self._upstream_changed()
         is_bilibili_media_cdn = host == "bilivideo.cn" or host.endswith(".bilivideo.cn")
-        if port not in (None, 443) and not (port == 8082 and is_bilibili_media_cdn):
+        is_pgc_media_cdn = host == _PGC_CDN_SUFFIX or host.endswith(f".{_PGC_CDN_SUFFIX}")
+        special_port_allowed = (port == 8082 and is_bilibili_media_cdn) or (
+            port == _PGC_CDN_HTTPS_PORT and is_pgc_media_cdn
+        )
+        if port not in (None, 443) and not special_port_allowed:
             raise self._upstream_changed()
 
     @staticmethod
@@ -845,6 +1278,13 @@ class BilibiliProvider:
         return response["data"]
 
     @staticmethod
+    def _response_result(response: dict[str, Any]) -> dict[str, Any]:
+        result = response.get("result")
+        if not isinstance(result, dict):
+            raise BilibiliProvider._upstream_changed()
+        return result
+
+    @staticmethod
     def _raise_for_provider_code(response: dict[str, Any]) -> None:
         code = response.get("code")
         if code == 0:
@@ -901,8 +1341,8 @@ class BilibiliProvider:
     def _invalid_link() -> AppError:
         return AppError(
             ErrorCode.INVALID_LINK,
-            "无法识别该链接，请使用普通 BV/AV 视频链接",
-            action="输入 BV 号、AV 号或 https://www.bilibili.com/video/... 链接",
+            "无法识别该链接，请使用 BV/AV 视频或番剧 ss/ep 链接",
+            action="输入视频标识，或复制 Bilibili 视频/番剧的完整 HTTPS 链接",
         )
 
     @staticmethod

@@ -14,6 +14,9 @@ class VideoReference:
     aid: int | None
     page_number: int
     normalized_url: str
+    provider: str = "bilibili"
+    season_id: int | None = None
+    episode_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +64,12 @@ class ProviderStream:
     access_requirement: StreamAccessRequirement
     compatibility: str
     url: str
+    mime_type: str | None = None
+    codec_string: str | None = None
+    init_range_start: int | None = None
+    init_range_end: int | None = None
+    index_range_start: int | None = None
+    index_range_end: int | None = None
     backup_urls: tuple[str, ...] = field(default_factory=tuple)
 
 

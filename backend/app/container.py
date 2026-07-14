@@ -16,6 +16,7 @@ from app.services.auth import AuthService
 from app.services.diagnostics import DiagnosticsService
 from app.services.downloads import DownloadExecutor
 from app.services.jobs import JobService
+from app.services.previews import PreviewService
 from app.services.runtime_settings import RuntimeSettingsCoordinator
 from app.services.settings import SettingsService
 from app.services.videos import VideoService
@@ -29,6 +30,7 @@ class ApplicationContainer:
     provider: VideoProvider
     auth_service: AuthService
     video_service: VideoService
+    preview_service: PreviewService
     settings_service: SettingsService
     artifact_service: ArtifactService
     download_executor: DownloadExecutor

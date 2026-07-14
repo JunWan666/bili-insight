@@ -24,25 +24,26 @@ defineProps<{
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
+  gap: 20px;
+  margin-bottom: 18px;
 }
 
 .page-eyebrow {
-  margin: 0 0 7px;
+  margin: 0 0 5px;
   color: var(--brand);
   font-size: 12px;
   font-weight: 750;
-  letter-spacing: .12em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
-h1 { margin: 0; font-size: clamp(26px, 3vw, 38px); line-height: 1.16; letter-spacing: -.035em; }
-.description { max-width: 700px; margin: 9px 0 0; color: var(--text-secondary); line-height: 1.65; }
-.page-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+h1 { margin: 0; font-size: 32px; line-height: 1.16; letter-spacing: 0; }
+.description { max-width: 760px; margin: 6px 0 0; color: var(--text-secondary); line-height: 1.5; }
+.page-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 
 @media (max-width: 767px) {
   .page-header { display: block; margin-bottom: 18px; }
+  h1 { font-size: 26px; }
   .page-actions { justify-content: flex-start; margin-top: 16px; }
 }
 </style>

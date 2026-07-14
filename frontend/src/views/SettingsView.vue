@@ -187,22 +187,26 @@ onMounted(() => { void auth.load(); void loadSettings() })
 
           <div v-else-if="auth.status?.status === 'expired' || auth.status?.status === 'error'" class="auth-warning"><el-icon><Warning /></el-icon><div><strong>{{ auth.status.status === 'expired' ? '登录状态已失效' : '登录验证暂时异常' }}</strong><p>{{ auth.status.message || (auth.status.status === 'expired' ? '当前已安全降级为匿名模式，请重新上传。' : '原配置已保留，可稍后重新校验。') }}</p></div></div>
 
-          <div class="privacy-alert"><el-icon><Lock /></el-icon><div><strong>Cookie 等同账号会话凭据</strong><p>仅上传你自己的 Cookie 文件。原始上传文件在服务端解析后立即删除；凭据只会按域和 path 规则发送给允许的 Bilibili 服务。</p></div></div>
+          <div class="auth-workspace">
+            <div class="privacy-alert"><el-icon><Lock /></el-icon><div><strong>Cookie 等同账号会话凭据</strong><p>仅上传你自己的 Cookie 文件。原始上传文件在服务端解析后立即删除；凭据只会按域和 path 规则发送给允许的 Bilibili 服务。</p></div></div>
 
-          <div class="upload-area" :class="{ dragging: dragActive, selected: selectedFile }" @dragenter.prevent="dragActive = true" @dragover.prevent="dragActive = true" @dragleave.prevent="dragActive = false" @drop.prevent="dropFile">
-            <input ref="fileInput" class="sr-only" type="file" accept=".json,application/json,text/json" data-testid="cookie-file-input" @change="selectFile">
-            <el-icon><UploadFilled /></el-icon>
-            <template v-if="selectedFile"><strong>{{ selectedFile.name }}</strong><p>{{ formatBytes(selectedFile.size) }} · 文件内容不会在前端读取</p><el-button @click="fileInput?.click()">更换文件</el-button></template>
-            <template v-else><strong>拖入 Cookie JSON，或从设备选择</strong><p>仅接受 JSON，最大 1 MB；移动端会打开系统文件选择器。</p><el-button type="primary" plain @click="fileInput?.click()">选择文件</el-button></template>
-          </div>
-          <p v-if="uploadError" class="upload-error" role="alert">{{ uploadError }}</p>
+            <div class="auth-upload-column">
+              <div class="upload-area" :class="{ dragging: dragActive, selected: selectedFile }" @dragenter.prevent="dragActive = true" @dragover.prevent="dragActive = true" @dragleave.prevent="dragActive = false" @drop.prevent="dropFile">
+                <input ref="fileInput" class="sr-only" type="file" accept=".json,application/json,text/json" data-testid="cookie-file-input" @change="selectFile">
+                <el-icon><UploadFilled /></el-icon>
+                <template v-if="selectedFile"><strong>{{ selectedFile.name }}</strong><p>{{ formatBytes(selectedFile.size) }} · 文件内容不会在前端读取</p><el-button @click="fileInput?.click()">更换文件</el-button></template>
+                <template v-else><strong>拖入 Cookie JSON，或从设备选择</strong><p>仅接受 JSON，最大 1 MB；移动端会打开系统文件选择器。</p><el-button type="primary" plain @click="fileInput?.click()">选择文件</el-button></template>
+              </div>
+              <p v-if="uploadError" class="upload-error" role="alert">{{ uploadError }}</p>
+            </div>
 
-          <label class="remember-row"><span><strong>在本机记住登录态</strong><small>关闭时仅在本次服务会话使用；开启后由服务端主密钥认证加密保存。</small></span><el-switch v-model="rememberCookie" /></label>
+            <label class="remember-row"><span><strong>在本机记住登录态</strong><small>关闭时仅在本次服务会话使用；开启后由服务端主密钥认证加密保存。</small></span><el-switch v-model="rememberCookie" /></label>
 
-          <div class="auth-actions">
-            <el-button type="primary" :loading="auth.loading" :disabled="!selectedFile" :icon="Key" data-testid="cookie-upload-submit" @click="uploadCookie">{{ auth.isAuthenticated ? '校验并替换 Cookie' : '上传并校验' }}</el-button>
-            <el-button v-if="auth.status && auth.status.status !== 'anonymous'" :loading="auth.loading" :icon="Refresh" @click="validateCookie">重新校验</el-button>
-            <el-button v-if="auth.status && auth.status.status !== 'anonymous'" type="danger" plain :loading="auth.loading" :icon="Delete" @click="clearCookie">彻底清除</el-button>
+            <div class="auth-actions">
+              <el-button type="primary" :loading="auth.loading" :disabled="!selectedFile" :icon="Key" data-testid="cookie-upload-submit" @click="uploadCookie">{{ auth.isAuthenticated ? '校验并替换 Cookie' : '上传并校验' }}</el-button>
+              <el-button v-if="auth.status && auth.status.status !== 'anonymous'" :loading="auth.loading" :icon="Refresh" @click="validateCookie">重新校验</el-button>
+              <el-button v-if="auth.status && auth.status.status !== 'anonymous'" type="danger" plain :loading="auth.loading" :icon="Delete" @click="clearCookie">彻底清除</el-button>
+            </div>
           </div>
         </section>
 
@@ -271,14 +275,22 @@ onMounted(() => { void auth.load(); void loadSettings() })
 </template>
 
 <style scoped>
-.settings-view { max-width: 1120px; margin: 0 auto; }.settings-layout { display: grid; grid-template-columns: 230px 1fr; align-items: start; gap: 16px; }.settings-nav { display: grid; gap: 4px; padding: 8px; }.settings-nav button { display: flex; align-items: center; gap: 11px; min-height: 59px; padding: 9px 11px; border: 0; border-radius: 11px; background: transparent; color: var(--text-secondary); text-align: left; cursor: pointer; }.settings-nav button.active { background: var(--brand-soft); color: var(--brand); }.settings-nav .el-icon { flex: 0 0 auto; font-size: 19px; }.settings-nav strong, .settings-nav small { display: block; }.settings-nav strong { font-size: 12px; }.settings-nav small { margin-top: 3px; color: var(--text-tertiary); font-size: 10px; }
-.settings-panel { min-width: 0; overflow: clip; }.settings-section { padding: clamp(19px, 3vw, 30px); }.section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--line-soft); }.section-head h2 { margin: 0; font-size: 20px; }.section-head p { max-width: 620px; margin: 6px 0 0; color: var(--text-secondary); line-height: 1.65; }
+.settings-view { width: 100%; }.settings-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); align-items: start; gap: 14px; }.settings-nav { display: grid; gap: 3px; padding: 7px; }.settings-nav button { display: flex; align-items: center; gap: 11px; min-height: 52px; padding: 8px 10px; border: 0; border-radius: 11px; background: transparent; color: var(--text-secondary); text-align: left; cursor: pointer; }.settings-nav button.active { background: var(--brand-soft); color: var(--brand); }.settings-nav .el-icon { flex: 0 0 auto; font-size: 19px; }.settings-nav strong, .settings-nav small { display: block; }.settings-nav strong { font-size: 12px; }.settings-nav small { margin-top: 2px; color: var(--text-tertiary); font-size: 10px; }
+.settings-panel { min-width: 0; overflow: clip; }.settings-section { padding: 22px; }.section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 17px; padding-bottom: 15px; border-bottom: 1px solid var(--line-soft); }.section-head h2 { margin: 0; font-size: 20px; }.section-head p { max-width: 720px; margin: 5px 0 0; color: var(--text-secondary); line-height: 1.55; }
 .account-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; margin-bottom: 17px; padding: 16px; border: 1px solid #a9ddca; border-radius: 14px; background: #effaf5; }.account-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #d4f1e4; color: var(--success); }.account-icon svg { width: 19px; }.account-card small, .account-card strong, .account-card p { display: block; margin: 0; }.account-card > div > small { color: #4f8c76; font-size: 10px; }.account-card > div > strong { margin-top: 4px; }.account-card p { margin-top: 4px; color: #4f7869; font-size: 11px; }.account-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 0; }.account-card dt { color: #62927f; font-size: 9px; }.account-card dd { margin: 4px 0 0; color: #386c59; font-size: 10px; }
-.auth-warning, .privacy-alert { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 17px; padding: 14px; border-radius: 12px; }.auth-warning { background: #fff2e8; color: #99521d; }.privacy-alert { background: var(--brand-soft); color: var(--brand); }.auth-warning p, .privacy-alert p { margin: 4px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.6; }
+.auth-warning, .privacy-alert { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 14px; padding: 13px; border-radius: 12px; }.auth-warning { background: #fff2e8; color: #99521d; }.privacy-alert { background: var(--brand-soft); color: var(--brand); }.auth-warning p, .privacy-alert p { margin: 4px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
 .upload-area { display: grid; place-items: center; min-height: 210px; padding: 25px; border: 1.5px dashed var(--line); border-radius: 15px; background: var(--surface-muted); text-align: center; transition: .16s; }.upload-area.dragging { border-color: var(--brand); background: var(--brand-soft); }.upload-area.selected { border-style: solid; }.upload-area > .el-icon { margin-bottom: 10px; color: var(--brand); font-size: 42px; }.upload-area strong { overflow-wrap: anywhere; }.upload-area p { margin: 7px 0 14px; color: var(--text-tertiary); font-size: 11px; }.upload-error { margin: 9px 0 0; color: var(--danger); }
-.remember-row, .switch-field { display: flex; align-items: center; justify-content: space-between; gap: 22px; }.remember-row { margin-top: 17px; padding: 14px; border: 1px solid var(--line-soft); border-radius: 12px; }.remember-row strong, .remember-row small, .switch-field strong, .switch-field small { display: block; }.remember-row strong, .switch-field strong { font-size: 12px; }.remember-row small, .switch-field small { margin-top: 4px; color: var(--text-tertiary); font-size: 10px; line-height: 1.5; }.auth-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 19px; }
-.settings-loading { padding: 30px; }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 21px 18px; }.form-grid > label { display: grid; align-content: start; gap: 7px; min-width: 0; }.form-grid > label > span { color: var(--text-secondary); font-size: 11px; font-weight: 650; }.form-grid > label > small { color: var(--text-tertiary); font-size: 10px; }.form-grid .wide { grid-column: 1 / -1; }.form-grid :deep(.el-input-number) { width: 100%; }.form-grid .switch-field { display: flex; min-height: 60px; padding: 11px; border: 1px solid var(--line-soft); border-radius: 11px; }
+.auth-workspace { display: grid; gap: 14px; }.remember-row, .switch-field { display: flex; align-items: center; justify-content: space-between; gap: 22px; }.remember-row { padding: 13px; border: 1px solid var(--line-soft); border-radius: 12px; }.remember-row strong, .remember-row small, .switch-field strong, .switch-field small { display: block; }.remember-row strong, .switch-field strong { font-size: 12px; }.remember-row small, .switch-field small { margin-top: 4px; color: var(--text-tertiary); font-size: 10px; line-height: 1.5; }.auth-actions { display: flex; flex-wrap: wrap; gap: 8px; }.auth-actions .el-button { margin-left: 0; }
+.settings-loading { padding: 30px; }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }.form-grid > label { display: grid; align-content: start; gap: 7px; min-width: 0; }.form-grid > label > span { color: var(--text-secondary); font-size: 11px; font-weight: 650; }.form-grid > label > small { color: var(--text-tertiary); font-size: 10px; }.form-grid .wide { grid-column: 1 / -1; }.form-grid :deep(.el-input-number) { width: 100%; }.form-grid .switch-field { display: flex; min-height: 60px; padding: 11px; border: 1px solid var(--line-soft); border-radius: 11px; }
 .save-error { margin: 0 28px 15px; }.save-bar { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 14px 28px; border-top: 1px solid var(--line-soft); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(14px); }.save-bar span { margin-right: auto; color: var(--text-tertiary); font-size: 11px; }
+@media (min-width: 1200px) {
+  .auth-workspace { grid-template-columns: minmax(250px, .8fr) minmax(350px, 1.2fr); grid-template-rows: auto auto 1fr; column-gap: 18px; }
+  .auth-workspace .privacy-alert { grid-column: 1; grid-row: 1; margin: 0; }
+  .auth-upload-column { grid-column: 2; grid-row: 1 / span 3; }
+  .auth-workspace .remember-row { grid-column: 1; grid-row: 2; }
+  .auth-workspace .auth-actions { grid-column: 1; grid-row: 3; align-self: end; }
+  .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 900px) { .settings-layout { grid-template-columns: 190px 1fr; }.account-card { grid-template-columns: auto 1fr; }.account-card dl { grid-column: 2; } }
 @media (max-width: 767px) {
   .settings-layout { grid-template-columns: 1fr; }.settings-nav { display: flex; max-width: 100%; margin-inline: 0; padding: 8px; overflow-x: auto; border: 0; border-radius: 0; background: transparent; box-shadow: none; scrollbar-width: none; }.settings-nav button { flex: 0 0 auto; min-height: 48px; padding: 8px 12px; border: 1px solid var(--line); background: var(--surface); }.settings-nav button.active { border-color: var(--brand); }.settings-nav button small { display: none; }
