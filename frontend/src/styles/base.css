@@ -76,6 +76,23 @@ img { max-width: 100%; }
 .el-input__wrapper, .el-select__wrapper, .el-textarea__inner { box-shadow: 0 0 0 1px var(--line) inset; }
 .el-dialog, .el-drawer { --el-bg-color: var(--surface); }
 .el-message-box { max-width: calc(100vw - 32px); }
+.el-message-box.compact-delete-confirm {
+  width: min(340px, calc(100vw - 32px));
+  padding: 16px;
+  border-radius: 10px;
+}
+.compact-delete-confirm .el-message-box__header { padding-bottom: 6px; }
+.compact-delete-confirm .el-message-box__content { padding: 7px 0 11px; }
+.compact-delete-confirm .el-message-box__message { line-height: 1.6; }
+.compact-delete-confirm .el-message-box__btns {
+  justify-content: center;
+  gap: 8px;
+  padding-top: 5px;
+}
+.compact-delete-confirm .el-message-box__btns .el-button {
+  min-width: 88px;
+  margin: 0;
+}
 .el-empty { --el-empty-fill-color-0: var(--surface-muted); }
 .el-table { --el-table-border-color: var(--line-soft); --el-table-header-bg-color: var(--surface-muted); --el-table-row-hover-bg-color: var(--brand-soft); }
 

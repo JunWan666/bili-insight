@@ -152,12 +152,12 @@ export interface PreviewSession {
   manifestUrl: string
   expiresAt: string
   duration: number
-  video: PreviewTrack
+  video: PreviewTrack | null
   audio: PreviewTrack | null
 }
 
 export interface CreatePreviewRequest {
-  videoStreamId: string
+  videoStreamId: string | null
   audioStreamId: string | null
   accessMode: Exclude<AccessMode, 'auto'>
 }

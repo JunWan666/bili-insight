@@ -234,23 +234,33 @@ class PreviewService:
 
     async def create(
         self,
-        video_stream_id: str,
+        video_stream_id: str | None,
         audio_stream_id: str | None,
         access_mode: AccessMode,
     ) -> PreviewRead:
-        identifiers = [video_stream_id]
-        if audio_stream_id is not None:
-            identifiers.append(audio_stream_id)
+        identifiers = [
+            stream_id for stream_id in (video_stream_id, audio_stream_id) if stream_id is not None
+        ]
+        if not identifiers:
+            raise AppError(
+                ErrorCode.VALIDATION_ERROR,
+                "预览至少需要选择一个媒体流",
+                action="选择视频或音频规格后重试",
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            )
         resolved = await self._resolve_stream_sources(identifiers, access_mode)
         records = {item.id: item for item in await self._load_stream_records(identifiers)}
-        video = records.get(video_stream_id)
+        video = records.get(video_stream_id) if video_stream_id is not None else None
         audio = records.get(audio_stream_id) if audio_stream_id is not None else None
-        if video is None or (audio_stream_id is not None and audio is None):
+        if (video_stream_id is not None and video is None) or (
+            audio_stream_id is not None and audio is None
+        ):
             raise self._not_found()
-        self._validate_track(video, StreamKind.VIDEO, access_mode)
+        if video is not None:
+            self._validate_track(video, StreamKind.VIDEO, access_mode)
         if audio is not None:
             self._validate_track(audio, StreamKind.AUDIO, access_mode)
-            if audio.part_id != video.part_id:
+            if video is not None and audio.part_id != video.part_id:
                 raise AppError(
                     ErrorCode.VALIDATION_ERROR,
                     "预览音视频轨不属于同一分 P",
@@ -258,7 +268,10 @@ class PreviewService:
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 )
 
-        selected_records = [video, *([audio] if audio is not None else [])]
+        selected_records = [item for item in (video, audio) if item is not None]
+        primary = video or audio
+        if primary is None:
+            raise RuntimeError("Preview stream selection was not resolved")
         sources = dict(zip(identifiers, resolved, strict=True))
         tracks = {
             item.kind: PreviewTrack(
@@ -272,8 +285,8 @@ class PreviewService:
         session = PreviewSession(
             id=str(uuid.uuid4()),
             access_mode=access_mode,
-            part_id=video.part_id,
-            duration=max(1, video.part_duration),
+            part_id=primary.part_id,
+            duration=max(1, primary.part_duration),
             tracks=tracks,
             created_at=now,
             last_accessed_at=now,
@@ -765,14 +778,14 @@ class PreviewService:
                 raise self._preview_unavailable()
 
     def _session_read(self, session: PreviewSession) -> PreviewRead:
-        video = session.tracks[StreamKind.VIDEO].record
+        video_track = session.tracks.get(StreamKind.VIDEO)
         audio_track = session.tracks.get(StreamKind.AUDIO)
         return PreviewRead(
             id=session.id,
             manifest_url=f"/api/v1/previews/{session.id}/manifest.mpd",
             expires_at=self._expires_at(session),
             duration=session.duration,
-            video=self._track_read(video),
+            video=self._track_read(video_track.record) if video_track is not None else None,
             audio=self._track_read(audio_track.record) if audio_track is not None else None,
         )
 

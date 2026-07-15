@@ -837,14 +837,15 @@ async function installApiRoutes(page: Page, state: TestApiState): Promise<void> 
       return
     }
     if (method === 'POST' && path === '/previews') {
-      state.previewRequests.push(jsonBody(request))
+      const body = jsonBody(request)
+      state.previewRequests.push(body)
       await fulfillJson(route, {
         id: 'preview-e2e',
         manifestUrl: `${apiPrefix}/previews/preview-e2e/manifest.mpd`,
         expiresAt: '2026-07-14T08:30:00.000Z',
         duration: 110,
-        video: { streamId: 'video-1080-avc', mimeType: 'video/mp4', codecString: 'avc1.640028' },
-        audio: { streamId: 'audio-aac-192', mimeType: 'audio/mp4', codecString: 'mp4a.40.2' },
+        video: body.videoStreamId == null ? null : { streamId: body.videoStreamId, mimeType: 'video/mp4', codecString: 'avc1.640028' },
+        audio: body.audioStreamId == null ? null : { streamId: body.audioStreamId, mimeType: 'audio/mp4', codecString: 'mp4a.40.2' },
       }, 201)
       return
     }

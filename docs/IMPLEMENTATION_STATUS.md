@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-当前版本达到本地单用户/可信环境的 Production Ready 标准。`v1.2.0` 新增任务单项/批量删除、最近解析单项/批量删除，以及按视频标题折叠的产物中心；任务删除会把已有产物事务性转为受管保留文件，活动任务与有关联数据的视频记录会被安全阻止删除。
+当前版本达到本地单用户/可信环境的 Production Ready 标准。`v1.2.1` 优化首页解析工作区与紧凑删除确认框，最近解析改为更清爽的单项删除，并新增独立音轨在线试听；任务删除仍会把已有产物事务性转为受管保留文件，活动任务与有关联数据的视频记录会被安全阻止删除。
 
 ## 当前阶段
 
@@ -14,8 +14,8 @@
 | Provider、Cookie 与解析 | verified | 原 BV/AV 能力保持通过；新增 `ss/ep`、Season/Episode、PGC 匿名/登录/会员规格、Provider 隔离、特别篇稳定性和 Cookie 清除回归通过 |
 | 下载、任务与产物 | verified | DASH 下载、合并、FFprobe、暂停恢复、重试、任务批量删除、最近解析安全删除、产物折叠分组、Range 与删除测试通过 |
 | 媒体与内容分析 | verified | 基础、媒体、音频、字幕、ASR/OCR 适配、镜头、摘要、编辑和导出链路通过 |
-| 在线播放预览 | verified | Shaka 组件、静态 SegmentBase MPD、同源 Range 代理、TTL/限额、强制刷新、登录态清理、安全故障注入及真实 4K 播放通过 |
-| Vue 页面与移动端 | verified | 六个核心页面保留；桌面全宽一屏工作区、预览弹窗和移动端遮挡修复通过完整跨浏览器矩阵 |
+| 在线播放预览 | verified | Shaka 组件、静态 SegmentBase MPD、视频与独立音轨预览、同源 Range 代理、TTL/限额、强制刷新、登录态清理、安全故障注入及真实 4K 播放通过 |
+| Vue 页面与移动端 | verified | 六个核心页面保留；首页解析区、紧凑删除框、桌面全宽一屏工作区、预览弹窗和移动端遮挡修复通过完整跨浏览器矩阵 |
 | Docker、运维与安全 | verified | 最新生产镜像重建、`0006_application_auth` 实际迁移、健康检查、CDN 端口窄放行和预览代理安全测试通过 |
 | 全量测试与 PRD 审计 | verified | 原 AC 与新增 AC-PARSE-06、AC-PREVIEW、AC-MOBILE-06 均具备自动化及真实运行证据 |
 
@@ -69,9 +69,9 @@
 
 | 门禁 | 当前结果 |
 | --- | --- |
-| 后端 Pytest | 491 passed，应用覆盖率 86.68%，高于 85% 门槛 |
+| 后端 Pytest | 492 passed，应用覆盖率 86.65%，高于 85% 门槛 |
 | 后端静态检查 | Ruff check、Ruff format check、mypy strict 全部通过 |
-| 前端单元测试 | 19 个文件、105 项 Vitest 全部通过 |
+| 前端单元测试 | 19 个文件、106 项 Vitest 全部通过 |
 | 前端静态与构建 | ESLint、Vue/TypeScript typecheck、Vite production build 全部通过 |
 | 完整 Playwright 矩阵 | 189 项：174 passed、15 项按设备能力预期 skipped；Chromium 手机/平板/桌面、WebKit 手机/桌面和 Firefox 桌面 0 failed |
 | Docker 与迁移 | 最终源码已在 CI 中构建前后端生产镜像并完成 Compose 启动、健康与持久化验收；本机两个容器 healthy，Alembic 为 `0006_application_auth (head)` |

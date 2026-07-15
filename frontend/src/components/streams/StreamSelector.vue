@@ -22,6 +22,7 @@ const emit = defineEmits<{
   'update:selectedAudioId': [value: string | null]
   configure: []
   'audio-download': []
+  'audio-preview': []
   preview: []
   verify: [streamIds: string[]]
 }>()
@@ -38,6 +39,7 @@ const selectedVideo = computed(() => props.streams.videos.find((stream) => strea
 const selectedAudio = computed(() => props.streams.audios.find((stream) => stream.id === props.selectedAudioId) ?? null)
 const { isMobile } = useMobile()
 const selectedVideoPreviewable = computed(() => hasPreviewMetadata(selectedVideo.value))
+const selectedAudioPreviewable = computed(() => hasPreviewMetadata(selectedAudio.value))
 const audioPreviewFallback = computed(() => (
   selectedAudio.value && !hasPreviewMetadata(selectedAudio.value)
     ? '所选音轨缺少在线预览信息，播放时将临时使用无音轨模式；下载不受影响。'
@@ -268,8 +270,21 @@ watch(
         <small v-if="audioPreviewFallback" class="preview-fallback">{{ audioPreviewFallback }}</small>
       </div>
       <div class="selection-actions">
+        <el-tooltip :disabled="isMobile" :content="selectedAudioPreviewable ? '在线试听当前所选音轨' : '该音轨暂不具备在线试听信息'" placement="top">
+          <el-button
+            v-if="selectedAudio"
+            size="large"
+            :icon="Headset"
+            :disabled="!selectedAudioPreviewable"
+            data-testid="open-audio-preview"
+            @click="$emit('audio-preview')"
+          >
+            试听音频
+          </el-button>
+        </el-tooltip>
         <el-button
           v-if="selectedAudio"
+          size="large"
           :icon="Headset"
           @click="$emit('audio-download')"
         >

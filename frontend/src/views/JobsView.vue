@@ -195,7 +195,7 @@ async function removeJob(job: Job): Promise<void> {
     await ElMessageBox.confirm(
       `删除“${job.videoTitle || typeView[job.type].label}”的这条任务记录？关联产物会转为受管保留文件，仍可在产物中心下载或彻底删除；关联分析记录会一并清理。`,
       '删除任务',
-      { type: 'warning', confirmButtonText: '删除任务', cancelButtonText: '取消' },
+      { type: 'warning', confirmButtonText: '删除任务', cancelButtonText: '取消', customClass: 'compact-delete-confirm' },
     )
     busyJobId.value = job.id
     await jobs.remove(job.id)
@@ -214,7 +214,7 @@ async function removeSelected(): Promise<void> {
     await ElMessageBox.confirm(
       `删除选中的 ${selectedJobs.value.length} 条终态任务？任务产物会转为受管保留文件，关联分析记录会一并清理。`,
       '批量删除任务',
-      { type: 'warning', confirmButtonText: '批量删除', cancelButtonText: '取消' },
+      { type: 'warning', confirmButtonText: '批量删除', cancelButtonText: '取消', customClass: 'compact-delete-confirm' },
     )
     const result = await jobs.removeMany(selectedIds.value)
     selectedIds.value = result.failedIds

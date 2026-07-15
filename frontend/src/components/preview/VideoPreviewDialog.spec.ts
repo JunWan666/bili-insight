@@ -120,6 +120,28 @@ describe('VideoPreviewDialog', () => {
     expect(apiMocks.remove).toHaveBeenCalledWith(previewSession.id)
   })
 
+  it('creates a compact audio-only preview session', async () => {
+    const audioOnlySession: PreviewSession = {
+      ...previewSession,
+      video: null,
+    }
+    apiMocks.create.mockResolvedValueOnce(audioOnlySession)
+    mount(VideoPreviewDialog, {
+      attachTo: document.body,
+      props: { modelValue: true, video, part, videoStream: null, audioStream, accessMode: 'authenticated' },
+    })
+    await flushPromises()
+
+    expect(apiMocks.create).toHaveBeenCalledWith({
+      videoStreamId: null,
+      audioStreamId: audioStream.id,
+      accessMode: 'authenticated',
+    })
+    expect(document.body.textContent).toContain('试听音频')
+    expect(document.querySelector('[data-testid="preview-audio"]')).not.toBeNull()
+    expect(playerMocks.load).toHaveBeenCalledWith(audioOnlySession.manifestUrl)
+  })
+
   it('does not create a session when the selected stream lacks preview metadata', async () => {
     mount(VideoPreviewDialog, {
       attachTo: document.body,

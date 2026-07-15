@@ -50,6 +50,7 @@ const downloadOpen = ref(false)
 const batchDownloadOpen = ref(false)
 const analysisOpen = ref(false)
 const previewOpen = ref(false)
+const previewAudioOnly = ref(false)
 const downloadAudioOnly = ref(false)
 const refreshingIdentity = ref(false)
 const verifyingStreams = ref(false)
@@ -157,6 +158,20 @@ function openPreview(): void {
     ElMessage.warning('该媒体流暂不具备浏览器预览信息，请重新解析或直接下载')
     return
   }
+  previewAudioOnly.value = false
+  previewOpen.value = true
+}
+
+function openAudioPreview(): void {
+  if (!selectedPart.value || !selectedAudioStream.value) {
+    ElMessage.warning('请先选择需要试听的音频流')
+    return
+  }
+  if (!selectedAudioStream.value.previewSupported) {
+    ElMessage.warning('该音轨暂不具备浏览器试听信息，请重新解析或直接下载')
+    return
+  }
+  previewAudioOnly.value = true
   previewOpen.value = true
 }
 
@@ -290,6 +305,7 @@ onMounted(() => void initialize())
             :verifying="verifyingStreams"
             @configure="openDownload"
             @audio-download="openDownload(true)"
+            @audio-preview="openAudioPreview"
             @preview="openPreview"
             @verify="verifySelectedStreams"
           />
@@ -366,7 +382,7 @@ onMounted(() => void initialize())
         v-model="previewOpen"
         :video="video"
         :part="selectedPart"
-        :video-stream="selectedVideoStream"
+        :video-stream="previewAudioOnly ? null : selectedVideoStream"
         :audio-stream="selectedAudioStream"
         :access-mode="actualAccessMode"
       />

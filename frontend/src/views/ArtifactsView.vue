@@ -242,7 +242,7 @@ async function removeSelected(): Promise<void> {
     await ElMessageBox.confirm(
       `彻底删除选中的 ${selectedArtifacts.value.length} 个产物及文件，预计释放 ${formatBytes(totalSize)}。此操作无法恢复。`,
       '批量删除产物',
-      { type: 'warning', confirmButtonText: '全部彻底删除', cancelButtonText: '取消' },
+      { type: 'warning', confirmButtonText: '全部彻底删除', cancelButtonText: '取消', customClass: 'compact-delete-confirm' },
     )
   } catch {
     return
@@ -265,13 +265,13 @@ async function removeArtifact(artifact: Artifact): Promise<void> {
       await ElMessageBox.confirm(
         `“${artifact.filename}”是受管保留文件。删除后将释放 ${formatBytes(artifact.size)} 磁盘空间且无法恢复。`,
         '彻底删除保留文件',
-        { type: 'warning', confirmButtonText: '记录与文件一起删除', cancelButtonText: '取消' },
+        { type: 'warning', confirmButtonText: '记录与文件一起删除', cancelButtonText: '取消', customClass: 'compact-delete-confirm' },
       )
     } else {
       await ElMessageBox.confirm(
         `删除“${artifact.filename}”。选择“记录与文件”将释放 ${formatBytes(artifact.size)} 磁盘空间；选择“仅删除记录”会把文件转为可继续管理的受管保留文件。`,
         '删除产物',
-        { type: 'warning', confirmButtonText: '记录与文件', cancelButtonText: '仅删除记录', distinguishCancelAndClose: true },
+        { type: 'warning', confirmButtonText: '记录与文件', cancelButtonText: '仅删除记录', distinguishCancelAndClose: true, customClass: 'compact-delete-confirm' },
       )
       deleteFile = true
     }

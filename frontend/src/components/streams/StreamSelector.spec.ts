@@ -122,6 +122,10 @@ describe('StreamSelector', () => {
     expect(previewButton.attributes('disabled')).toBeUndefined()
     await previewButton.trigger('click')
     expect(wrapper.emitted('preview')).toHaveLength(1)
+    const audioPreviewButton = wrapper.get('[data-testid="open-audio-preview"]')
+    expect(audioPreviewButton.attributes('disabled')).toBeUndefined()
+    await audioPreviewButton.trigger('click')
+    expect(wrapper.emitted('audio-preview')).toHaveLength(1)
   })
 
   it('keeps video preview available while clearly marking a video-only fallback', async () => {

@@ -258,6 +258,19 @@ async def test_create_builds_internal_segment_base_manifest(settings: Settings) 
     assert resolver.calls == Counter({"video-stream": 1, "audio-stream": 1})
 
 
+async def test_create_supports_audio_only_preview(settings: Settings) -> None:
+    preview, resolver = service(settings)
+    result = await preview.create(None, "audio-stream", AccessMode.ANONYMOUS)
+    manifest = (await preview.manifest(result.id)).decode()
+
+    assert result.video is None
+    assert result.audio is not None and result.audio.stream_id == "audio-stream"
+    assert "media/video" not in manifest
+    assert "media/audio" in manifest
+    assert 'contentType="audio"' in manifest
+    assert resolver.calls == Counter({"audio-stream": 1})
+
+
 async def test_create_uses_metadata_refreshed_by_both_resolved_tracks(
     settings: Settings,
 ) -> None:

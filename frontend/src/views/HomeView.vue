@@ -30,8 +30,7 @@ const videos = useVideosStore()
 const input = ref('')
 const accessMode = ref<AccessMode>('auto')
 const validationMessage = ref('')
-const selectedRecentIds = ref<string[]>([])
-const deletingRecent = ref(false)
+const deletingRecentId = ref<string | null>(null)
 
 const modes: Array<{ value: AccessMode; title: string; description: string }> = [
   { value: 'auto', title: '自动', description: '先匿名解析，可手动补充登录画质' },
@@ -40,8 +39,6 @@ const modes: Array<{ value: AccessMode; title: string; description: string }> = 
 ]
 
 const canUseAuthenticated = computed(() => auth.isAuthenticated)
-const allRecentSelected = computed(() => videos.recent.length > 0 && videos.recent.every((video) => selectedRecentIds.value.includes(video.id)))
-const someRecentSelected = computed(() => selectedRecentIds.value.length > 0 && !allRecentSelected.value)
 
 async function pasteFromClipboard(): Promise<void> {
   try {
@@ -86,48 +83,19 @@ function selectMode(mode: AccessMode): void {
   validationMessage.value = ''
 }
 
-function toggleRecent(video: RecentVideo, selected: boolean): void {
-  selectedRecentIds.value = selected
-    ? Array.from(new Set([...selectedRecentIds.value, video.id]))
-    : selectedRecentIds.value.filter((id) => id !== video.id)
-}
-
-function toggleAllRecent(selected: boolean): void {
-  selectedRecentIds.value = selected ? videos.recent.map((video) => video.id) : []
-}
-
 async function removeRecent(video: RecentVideo): Promise<void> {
   try {
     await ElMessageBox.confirm(
       `从最近解析中删除“${video.title}”？仅无关联任务和分析记录的视频可以删除。`,
       '删除解析记录',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消', customClass: 'compact-delete-confirm' },
     )
-    deletingRecent.value = true
+    deletingRecentId.value = video.id
     await videos.removeRecent(video.id)
-    selectedRecentIds.value = selectedRecentIds.value.filter((id) => id !== video.id)
     ElMessage.success('最近解析记录已删除')
   } catch (reason) {
     if (reason !== 'cancel' && reason !== 'close') ElMessage.error(reason instanceof Error ? reason.message : '删除解析记录失败')
-  } finally { deletingRecent.value = false }
-}
-
-async function removeSelectedRecent(): Promise<void> {
-  if (!selectedRecentIds.value.length) return
-  try {
-    await ElMessageBox.confirm(
-      `删除选中的 ${selectedRecentIds.value.length} 条最近解析记录？有关联任务或分析的记录会保留并标记为删除失败。`,
-      '批量删除解析记录',
-      { type: 'warning', confirmButtonText: '批量删除', cancelButtonText: '取消' },
-    )
-    deletingRecent.value = true
-    const result = await videos.removeRecentMany(selectedRecentIds.value)
-    selectedRecentIds.value = result.failedIds
-    if (result.failedIds.length) ElMessage.warning(`已删除 ${result.deletedCount} 条，${result.failedIds.length} 条有关联数据未删除`)
-    else ElMessage.success(`已删除 ${result.deletedCount} 条最近解析记录`)
-  } catch (reason) {
-    if (reason !== 'cancel' && reason !== 'close') ElMessage.error(reason instanceof Error ? reason.message : '批量删除解析记录失败')
-  } finally { deletingRecent.value = false }
+  } finally { deletingRecentId.value = null }
 }
 
 onMounted(() => {
@@ -174,33 +142,36 @@ onMounted(() => {
           </div>
           <p v-if="validationMessage" class="validation" role="alert"><el-icon><CircleClose /></el-icon>{{ validationMessage }}</p>
 
-          <fieldset class="mode-fieldset">
-            <legend>本次解析身份</legend>
-            <div class="mode-options">
-              <button
-                v-for="mode in modes"
-                :key="mode.value"
-                type="button"
-                :data-testid="`access-mode-${mode.value}`"
-                :class="{ selected: accessMode === mode.value, disabled: mode.value === 'authenticated' && !canUseAuthenticated }"
-                :aria-pressed="accessMode === mode.value"
-                @click="selectMode(mode.value)"
-              >
-                <span class="radio-mark"><Check /></span>
-                <span><strong>{{ mode.title }}</strong><small>{{ mode.description }}</small></span>
-              </button>
+          <div class="parse-controls">
+            <fieldset class="mode-fieldset">
+              <legend>本次解析身份</legend>
+              <div class="mode-options">
+                <button
+                  v-for="mode in modes"
+                  :key="mode.value"
+                  type="button"
+                  :data-testid="`access-mode-${mode.value}`"
+                  :class="{ selected: accessMode === mode.value, disabled: mode.value === 'authenticated' && !canUseAuthenticated }"
+                  :aria-pressed="accessMode === mode.value"
+                  @click="selectMode(mode.value)"
+                >
+                  <span class="radio-mark"><Check /></span>
+                  <span><strong>{{ mode.title }}</strong><small>{{ mode.description }}</small></span>
+                </button>
+              </div>
+            </fieldset>
+
+            <div class="parse-submit-column">
+              <div v-if="auth.isAuthenticated && accessMode !== 'authenticated'" class="auth-explanation">
+                <el-icon><Lock /></el-icon>
+                <span>登录态已保存，本次仍优先匿名。</span>
+              </div>
+              <el-button class="parse-button" native-type="submit" type="primary" size="large" :loading="videos.loading" data-testid="parse-submit">
+                {{ videos.loading ? '正在安全解析…' : '开始解析' }}
+                <el-icon v-if="!videos.loading"><ArrowRight /></el-icon>
+              </el-button>
             </div>
-          </fieldset>
-
-          <div v-if="auth.isAuthenticated && accessMode !== 'authenticated'" class="auth-explanation">
-            <el-icon><Lock /></el-icon>
-            <span>系统已保存有效登录态，但本次首次解析不会携带 Cookie。</span>
           </div>
-
-          <el-button class="parse-button" native-type="submit" type="primary" size="large" :loading="videos.loading" data-testid="parse-submit">
-            {{ videos.loading ? '正在安全解析…' : '开始解析' }}
-            <el-icon v-if="!videos.loading"><ArrowRight /></el-icon>
-          </el-button>
         </form>
 
         <RequestError v-if="videos.error" class="parse-error" :error="videos.error" @retry="parseVideo" />
@@ -210,14 +181,9 @@ onMounted(() => {
     <section v-if="videos.recent.length" class="recent-section">
       <div class="section-heading">
         <div><h2>最近解析</h2><p>继续查看此前解析的视频和分 P。</p></div>
-        <div class="recent-batch-actions">
-          <el-checkbox :model-value="allRecentSelected" :indeterminate="someRecentSelected" @change="toggleAllRecent(Boolean($event))">全选</el-checkbox>
-          <el-button v-if="selectedRecentIds.length" type="danger" plain :icon="Delete" :loading="deletingRecent" @click="removeSelectedRecent">删除所选</el-button>
-        </div>
       </div>
       <div class="recent-grid">
         <article v-for="video in videos.recent" :key="video.id" class="recent-card surface-card">
-          <el-checkbox class="recent-checkbox" :model-value="selectedRecentIds.includes(video.id)" :aria-label="`选择 ${video.title}`" @change="toggleRecent(video, Boolean($event))" />
           <RouterLink :to="`/videos/${video.id}`" class="recent-main">
           <div class="recent-cover">
             <img :src="video.coverUrl" :alt="`${video.title} 封面`" loading="lazy" referrerpolicy="no-referrer" />
@@ -229,7 +195,7 @@ onMounted(() => {
             <small><el-icon><Clock /></el-icon>{{ formatDate(video.parsedAt) }}</small>
           </div>
           </RouterLink>
-          <div class="recent-actions"><a class="recent-source" :href="video.normalizedUrl" target="_blank" rel="noopener noreferrer">官方源视频</a><el-button text type="danger" :icon="Delete" :loading="deletingRecent" aria-label="删除解析记录" @click="removeRecent(video)" /></div>
+          <div class="recent-actions"><a class="recent-source" :href="video.normalizedUrl" target="_blank" rel="noopener noreferrer">官方源视频</a><el-button text type="danger" :icon="Delete" :loading="deletingRecentId === video.id" aria-label="删除解析记录" @click="removeRecent(video)" /></div>
         </article>
       </div>
     </section>
@@ -255,21 +221,23 @@ onMounted(() => {
 
 <style scoped>
 .home-view { width: 100%; }
-.hero { display: grid; grid-template-columns: minmax(290px, .82fr) minmax(500px, 1.18fr); align-items: center; gap: clamp(32px, 4vw, 64px); min-height: 0; padding: 10px 0 28px; }
+.hero { display: flex; flex-direction: column; align-items: center; gap: 28px; min-height: 0; padding: 18px 0 34px; }
 .eyebrow, .step-label { color: var(--brand); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.hero-copy h1 { margin: 12px 0 18px; font-size: 52px; line-height: 1.08; letter-spacing: 0; }
+.hero-copy { width: 100%; max-width: 900px; text-align: center; }
+.hero-copy h1 { margin: 12px 0 16px; font-size: 54px; line-height: 1.08; letter-spacing: 0; }
 .hero-copy h1 span { color: var(--brand); }
-.lead { max-width: 580px; margin: 0; color: var(--text-secondary); font-size: 15px; line-height: 1.65; }
-.parse-panel { padding: 26px; }
-.panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 19px; }
-.panel-heading h2 { margin: 7px 0 0; font-size: 23px; letter-spacing: -.03em; }
+.lead { max-width: 680px; margin: 0 auto; color: var(--text-secondary); font-size: 15px; line-height: 1.65; }
+.parse-panel { width: min(1040px, 100%); padding: 22px; border-radius: 16px; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.panel-heading h2 { margin: 5px 0 0; font-size: 18px; }
 .input-row { display: flex; gap: 8px; }
 .input-row :deep(.el-input__wrapper) { min-height: 52px; }
 .input-row.invalid :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px var(--danger) inset; }
 .paste-button { min-width: 92px; }
 .clear-button { display: none; }
 .validation { display: flex; align-items: center; gap: 7px; margin: 9px 0 0; color: var(--danger); line-height: 1.45; }
-.mode-fieldset { padding: 0; margin: 19px 0 0; border: 0; }
+.parse-controls { display: grid; grid-template-columns: minmax(0, 1fr) 210px; align-items: end; gap: 16px; }
+.mode-fieldset { min-width: 0; padding: 0; margin: 16px 0 0; border: 0; }
 .mode-fieldset legend { margin-bottom: 11px; color: var(--text-secondary); font-size: 13px; font-weight: 700; }
 .mode-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .mode-options button { display: flex; align-items: flex-start; gap: 9px; min-height: 82px; padding: 12px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); color: var(--text-primary); text-align: left; cursor: pointer; transition: border-color .16s, background .16s; }
@@ -281,19 +249,20 @@ onMounted(() => {
 .mode-options strong, .mode-options small { display: block; }
 .mode-options strong { margin-bottom: 5px; font-size: 13px; }
 .mode-options small { color: var(--text-tertiary); line-height: 1.4; }
-.auth-explanation { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--surface-muted); color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
-.parse-button { width: 100%; min-height: 48px; margin-top: 15px; }
+.parse-submit-column { display: grid; gap: 8px; }
+.auth-explanation { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 8px; background: var(--surface-muted); color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+.parse-button { width: 100%; min-height: 48px; margin: 0; }
 .parse-error { margin-top: 16px; }
 .recent-section { padding: 20px 0 28px; }
 .capabilities { padding: 32px 0; }
 .section-heading { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 16px; }
 .section-heading h2 { margin: 4px 0 0; font-size: 24px; letter-spacing: 0; }
 .section-heading p { margin: 5px 0 0; color: var(--text-secondary); }
-.recent-batch-actions { display: flex; align-items: center; gap: 10px; }
 .recent-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.recent-card { position: relative; overflow: hidden; color: inherit; text-decoration: none; transition: transform .16s, box-shadow .16s; }.recent-checkbox { position: absolute; z-index: 2; top: 10px; left: 10px; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 7px; background: rgba(255, 255, 255, .92); }
+.recent-card { position: relative; overflow: hidden; color: inherit; text-decoration: none; transition: transform .16s, box-shadow .16s; }
 .recent-main { display: block; color: inherit; text-decoration: none; }
-.recent-actions { display: flex; align-items: center; justify-content: space-between; min-height: 42px; padding: 0 8px 4px 14px; }.recent-source { color: var(--brand); font-size: 11px; font-weight: 650; text-decoration: none; }
+.recent-actions { display: flex; align-items: center; justify-content: space-between; min-height: 42px; padding: 0 8px 4px 14px; }
+.recent-source { color: var(--brand); font-size: 11px; font-weight: 650; text-decoration: none; }
 .recent-card:hover { transform: translateY(-2px); box-shadow: 0 11px 30px rgba(31, 36, 51, .1); }
 .recent-cover { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: var(--surface-muted); }
 .recent-cover img { width: 100%; height: 100%; object-fit: cover; }
@@ -316,10 +285,7 @@ onMounted(() => {
 .support-note a { display: flex; align-items: center; gap: 5px; font-weight: 700; text-decoration: none; white-space: nowrap; }
 
 @media (max-width: 1199px) {
-  .hero { grid-template-columns: 1fr; min-height: 0; padding-top: 20px; }
-  .hero-copy { max-width: 760px; }
-  .hero-copy h1 { font-size: 52px; }
-  .parse-panel { max-width: 800px; }
+  .hero-copy h1 { font-size: 48px; }
   .recent-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (min-width: 1200px) and (max-width: 1365px) {
@@ -331,10 +297,9 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    min-height: calc(100dvh - 86px);
-    padding: 3px 0 calc(88px + env(safe-area-inset-bottom));
+    min-height: auto;
+    padding: 3px 0 26px;
   }
-  .parse-panel { order: -1; }
   .hero-copy {
     position: absolute;
     width: 1px;
@@ -353,11 +318,11 @@ onMounted(() => {
   .input-row .el-input { grid-column: 1 / -1; }
   .paste-button { min-width: 0; }
   .clear-button { display: inline-flex; }
+  .parse-controls { grid-template-columns: 1fr; gap: 12px; }
   .mode-options { grid-template-columns: 1fr; }
   .mode-options button { min-height: 70px; align-items: center; }
   .mode-options strong { margin-bottom: 2px; }
   .recent-section, .capabilities { padding: 30px 0; }
-  .recent-section .section-heading { align-items: flex-end; }.recent-batch-actions { flex-direction: column; align-items: flex-end; }
   .recent-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .recent-body { padding: 11px; }
   .capability-grid { grid-template-columns: 1fr; }

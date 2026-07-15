@@ -237,7 +237,7 @@ export function normalizePreviewSession(value: unknown): PreviewSession {
     manifestUrl: stringValue(source.manifestUrl ?? source.manifest_url),
     expiresAt: stringValue(source.expiresAt ?? source.expires_at),
     duration: numberValue(source.duration),
-    video: {
+    video: source.video == null ? null : {
       streamId: stringValue(video.streamId ?? video.stream_id),
       mimeType: stringValue(video.mimeType ?? video.mime_type),
       codecString: stringValue(video.codecString ?? video.codec_string),
