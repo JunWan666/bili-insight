@@ -12,6 +12,7 @@ DEFAULT_PROCESS_MAX_THREADS = 4
 DEFAULT_PROCESS_MEMORY_LIMIT_BYTES = 4 * 1024**3
 DEFAULT_CHILD_PROCESS_CONCURRENCY = 3
 MINIMUM_PROCESS_MEMORY_LIMIT_BYTES = 64 * 1024**2
+WINDOWS_PROCESS_CREATION_FLAGS = 0x08000000 | 0x00000200
 
 _NATIVE_THREAD_VARIABLES = (
     "OMP_NUM_THREADS",
@@ -85,9 +86,7 @@ async def run_bounded_child_process(
     if memory_limit_bytes < MINIMUM_PROCESS_MEMORY_LIMIT_BYTES:
         raise ValueError("child process memory limit is below the safe minimum")
     environment = bounded_process_environment(max_threads)
-    creation_flags = (
-        subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
-    )
+    creation_flags = WINDOWS_PROCESS_CREATION_FLAGS if os.name == "nt" else 0
     slot = await acquire_child_process_slot_async()
     process: asyncio.subprocess.Process | None = None
     tasks: list[asyncio.Task[object]] = []
@@ -253,6 +252,12 @@ def _windows_process_resident_memory_bytes(process_id: int) -> int | None:
         import ctypes
         from ctypes import wintypes
 
+        windll = getattr(ctypes, "windll", None)
+        if windll is None:
+            return None
+        kernel32 = windll.kernel32
+        psapi = windll.psapi
+
         class ProcessMemoryCounters(ctypes.Structure):
             _fields_ = [
                 ("cb", wintypes.DWORD),
@@ -269,7 +274,7 @@ def _windows_process_resident_memory_bytes(process_id: int) -> int | None:
 
         process_query_limited_information = 0x1000
         process_vm_read = 0x0010
-        handle = ctypes.windll.kernel32.OpenProcess(
+        handle = kernel32.OpenProcess(
             process_query_limited_information | process_vm_read,
             False,
             process_id,
@@ -279,13 +284,13 @@ def _windows_process_resident_memory_bytes(process_id: int) -> int | None:
         try:
             counters = ProcessMemoryCounters()
             counters.cb = ctypes.sizeof(counters)
-            succeeded = ctypes.windll.psapi.GetProcessMemoryInfo(
+            succeeded = psapi.GetProcessMemoryInfo(
                 handle,
                 ctypes.byref(counters),
                 counters.cb,
             )
             return int(counters.WorkingSetSize) if succeeded else None
         finally:
-            ctypes.windll.kernel32.CloseHandle(handle)
+            kernel32.CloseHandle(handle)
     except (AttributeError, OSError, TypeError, ValueError):
         return None

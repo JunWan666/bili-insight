@@ -15,6 +15,7 @@ from typing import Any
 from app.core.process_limits import (
     DEFAULT_PROCESS_MEMORY_LIMIT_BYTES,
     MINIMUM_PROCESS_MEMORY_LIMIT_BYTES,
+    WINDOWS_PROCESS_CREATION_FLAGS,
     ChildProcessSlot,
     acquire_child_process_slot_async,
     apply_process_resource_limits,
@@ -363,11 +364,7 @@ class FFmpegProcessor:
             raise
 
     async def _spawn(self, arguments: Sequence[str]) -> asyncio.subprocess.Process:
-        creation_flags = (
-            subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
-            if os.name == "nt"
-            else 0
-        )
+        creation_flags = WINDOWS_PROCESS_CREATION_FLAGS if os.name == "nt" else 0
         slot = await acquire_child_process_slot_async()
         try:
             process = await asyncio.create_subprocess_exec(
