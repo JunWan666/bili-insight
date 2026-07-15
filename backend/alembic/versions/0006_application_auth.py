@@ -43,12 +43,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_app_sessions_user_id", "app_sessions", ["user_id"], unique=False)
-    op.create_index(
-        "ix_app_sessions_token_hash", "app_sessions", ["token_hash"], unique=True
-    )
-    op.create_index(
-        "ix_app_sessions_expires_at", "app_sessions", ["expires_at"], unique=False
-    )
+    op.create_index("ix_app_sessions_token_hash", "app_sessions", ["token_hash"], unique=True)
+    op.create_index("ix_app_sessions_expires_at", "app_sessions", ["expires_at"], unique=False)
 
 
 def downgrade() -> None:
