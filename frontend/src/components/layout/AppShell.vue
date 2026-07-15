@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Compass,
+  Clock,
   DocumentChecked,
+  Expand,
   Files,
   Film,
+  Fold,
   Monitor,
   Setting,
   SwitchButton,
@@ -22,9 +25,11 @@ const router = useRouter()
 const auth = useAuthStore()
 const appAuth = useAppAuthStore()
 const jobs = useJobsStore()
+const sidebarCollapsed = ref(window.localStorage.getItem('bili-insight:sidebar-collapsed') === 'true')
 
 const navigation = [
   { path: '/', label: '解析', icon: Compass, testId: 'nav-home' },
+  { path: '/recent', label: '最近', icon: Clock, testId: 'nav-recent' },
   { path: '/jobs', label: '任务', icon: DocumentChecked, badge: true, testId: 'nav-jobs' },
   { path: '/artifacts', label: '产物', icon: Files, testId: 'nav-artifacts' },
   { path: '/settings', label: '设置', icon: Setting, testId: 'nav-settings' },
@@ -37,6 +42,11 @@ const activePath = computed(() => {
 
 function navigate(path: string): void {
   if (route.path !== path) void router.push(path)
+}
+
+function toggleSidebar(): void {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  window.localStorage.setItem('bili-insight:sidebar-collapsed', String(sidebarCollapsed.value))
 }
 
 function handleVisibility(): void {
@@ -88,26 +98,38 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell">
-    <aside class="sidebar">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <aside class="sidebar" :class="{ 'is-collapsed': sidebarCollapsed }">
       <RouterLink class="brand" to="/" aria-label="Bili Insight 首页">
         <span class="brand-mark"><Film /></span>
         <span class="brand-copy"><strong>Bili Insight</strong><small>本地视频工作台</small></span>
       </RouterLink>
 
+      <el-tooltip :content="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'" placement="right">
+        <button class="sidebar-toggle" type="button" data-testid="sidebar-toggle" :aria-label="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'" @click="toggleSidebar">
+          <el-icon><Expand v-if="sidebarCollapsed" /><Fold v-else /></el-icon>
+        </button>
+      </el-tooltip>
+
       <nav class="desktop-nav" aria-label="主导航">
-        <button
+        <el-tooltip
           v-for="item in navigation"
           :key="item.path"
-          type="button"
-          :data-testid="`${item.testId}-desktop`"
-          :class="{ active: activePath === item.path }"
-          @click="navigate(item.path)"
+          :disabled="!sidebarCollapsed"
+          :content="item.label"
+          placement="right"
         >
-          <el-icon><component :is="item.icon" /></el-icon>
-          <span>{{ item.label }}</span>
-          <b v-if="item.badge && jobs.activeCount" class="nav-badge">{{ jobs.activeCount > 99 ? '99+' : jobs.activeCount }}</b>
-        </button>
+          <button
+            type="button"
+            :data-testid="`${item.testId}-desktop`"
+            :class="{ active: activePath === item.path }"
+            @click="navigate(item.path)"
+          >
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.label }}</span>
+            <b v-if="item.badge && jobs.activeCount" class="nav-badge">{{ jobs.activeCount > 99 ? '99+' : jobs.activeCount }}</b>
+          </button>
+        </el-tooltip>
       </nav>
 
       <div class="sidebar-spacer" />
@@ -116,9 +138,11 @@ onBeforeUnmount(() => {
         <span><small>本机管理员</small><strong>{{ appAuth.status?.username }}</strong></span>
         <el-tooltip content="退出登录" placement="right"><button type="button" aria-label="退出登录" @click="logout"><SwitchButton /></button></el-tooltip>
       </div>
-      <button class="diagnostics-link" type="button" @click="navigate('/diagnostics')">
-        <el-icon><Monitor /></el-icon><span>关于与诊断</span>
-      </button>
+      <el-tooltip :disabled="!sidebarCollapsed" content="关于与诊断" placement="right">
+        <button class="diagnostics-link" type="button" @click="navigate('/diagnostics')">
+          <el-icon><Monitor /></el-icon><span>关于与诊断</span>
+        </button>
+      </el-tooltip>
       <RouterLink class="auth-card" to="/settings">
         <AuthStatusBadge :status="auth.status" :loading="auth.loading" compact />
         <small>{{ auth.status?.maskedAccountName || 'Cookie 仅保存在本机服务端' }}</small>
@@ -130,7 +154,7 @@ onBeforeUnmount(() => {
       <RouterLink to="/settings"><AuthStatusBadge :status="auth.status" :loading="auth.loading" compact /></RouterLink>
     </header>
 
-    <main class="main-content" :class="{ 'is-video-workspace': route.path.startsWith('/videos/') }">
+    <main class="main-content" :class="{ 'is-video-workspace': route.path.startsWith('/videos/'), 'is-sidebar-collapsed': sidebarCollapsed }">
       <RouterView v-slot="{ Component }">
         <Transition name="page" mode="out-in">
           <component :is="Component" />
@@ -170,7 +194,10 @@ onBeforeUnmount(() => {
   border-right: 1px solid var(--line-soft);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   backdrop-filter: blur(18px);
+  transition: width .2s ease, padding .2s ease;
 }
+.sidebar-toggle { position: absolute; top: 31px; right: -15px; z-index: 2; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--text-secondary); box-shadow: 0 5px 14px rgba(31, 36, 51, .12); cursor: pointer; }
+.sidebar-toggle:hover { color: var(--brand); border-color: var(--brand); }
 .brand { display: flex; align-items: center; gap: 12px; padding: 0 8px 30px; color: var(--text-primary); text-decoration: none; }
 .brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: var(--brand); color: white; box-shadow: 0 8px 20px rgba(67, 86, 201, .24); }
 .brand-mark svg { width: 22px; height: 22px; }
@@ -192,7 +219,23 @@ onBeforeUnmount(() => {
 .diagnostics-link { margin-bottom: 10px; }
 .auth-card { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line-soft); border-radius: 14px; color: inherit; text-decoration: none; }
 .auth-card small { color: var(--text-tertiary); line-height: 1.4; overflow-wrap: anywhere; }
-.main-content { min-height: 100dvh; margin-left: 248px; padding: 42px clamp(28px, 4vw, 64px) 64px; }
+.main-content { min-height: 100dvh; margin-left: 248px; padding: 42px clamp(28px, 4vw, 64px) 64px; transition: margin-left .2s ease; }
+.sidebar.is-collapsed { width: 84px; padding-inline: 12px; }
+.sidebar.is-collapsed .brand { justify-content: center; padding-inline: 0; }
+.sidebar.is-collapsed .brand-copy,
+.sidebar.is-collapsed .desktop-nav button > span,
+.sidebar.is-collapsed .diagnostics-link span,
+.sidebar.is-collapsed .auth-card small,
+.sidebar.is-collapsed .auth-card :deep(.auth-badge span),
+.sidebar.is-collapsed .admin-session span { display: none; }
+.sidebar.is-collapsed .admin-session { display: flex; justify-content: center; padding-inline: 0; }
+.sidebar.is-collapsed .admin-session > .el-icon { display: none; }
+.sidebar.is-collapsed .desktop-nav button,
+.sidebar.is-collapsed .diagnostics-link { justify-content: center; padding: 0; }
+.sidebar.is-collapsed .nav-badge { position: absolute; margin: -27px 0 0 27px; }
+.sidebar.is-collapsed .auth-card { width: 48px; min-height: 48px; margin-inline: auto; place-items: center; padding: 0; border: 0; background: transparent; }
+.sidebar.is-collapsed .auth-card :deep(.auth-badge) { width: 32px; justify-content: center; padding: 0; }
+.main-content.is-sidebar-collapsed { margin-left: 84px; }
 .mobile-header, .mobile-nav { display: none; }
 .page-enter-active, .page-leave-active { transition: opacity .16s ease, transform .16s ease; }
 .page-enter-from { opacity: 0; transform: translateY(5px); }
@@ -204,6 +247,7 @@ onBeforeUnmount(() => {
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
+  .sidebar-toggle { display: none; }
   .sidebar { width: 84px; padding-inline: 12px; }
   .brand { justify-content: center; padding-inline: 0; }
   .brand-copy, .desktop-nav button > span, .diagnostics-link span, .auth-card small, .auth-card :deep(.auth-badge span), .admin-session span { display: none; }
@@ -226,7 +270,7 @@ onBeforeUnmount(() => {
   .mobile-brand .brand-mark { width: 34px; height: 34px; border-radius: 11px; }
   .main-content { min-height: calc(100dvh - 64px); margin-left: 0; padding: 22px 16px calc(88px + env(safe-area-inset-bottom)); }
   .mobile-nav {
-    position: fixed; inset: auto 0 0; z-index: 40; display: grid; grid-template-columns: repeat(4, 1fr); padding: 7px 8px max(7px, env(safe-area-inset-bottom));
+    position: fixed; inset: auto 0 0; z-index: 40; display: grid; grid-template-columns: repeat(5, 1fr); padding: 7px 8px max(7px, env(safe-area-inset-bottom));
     border-top: 1px solid var(--line-soft); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(18px);
   }
   .mobile-nav button { display: grid; place-items: center; gap: 2px; min-height: 52px; border: 0; border-radius: 12px; background: transparent; color: var(--text-tertiary); cursor: pointer; }

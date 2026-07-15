@@ -41,8 +41,8 @@
 - **真实媒体能力**：分别展示分辨率、帧率、编码、HDR、码率、音频和预估大小，不把理论档位当作可用流。
 - **媒体与内容分析**：提供 FFprobe、响度、频谱、镜头、关键帧、字幕、ASR、OCR 和证据摘要能力。
 - **应用安全与任务复用**：本机管理员登录保护业务接口；相同下载/分析请求自动复用并按视频聚合展示。
-- **任务与产物管理**：任务支持单项/批量删除，最近解析保留简洁的单项删除；产物按视频折叠聚合，并保留批量下载、批量删除与清理能力。
-- **桌面与移动端适配**：桌面端使用全宽单屏工作区，移动端使用底部导航、卡片、抽屉和安全区适配。
+- **任务与产物管理**：任务支持单项/批量删除，最近解析使用独立紧凑页面；产物按视频折叠聚合，并保留批量下载、批量删除与清理能力。
+- **桌面与移动端适配**：桌面端使用可折叠侧栏和单屏解析工作台，移动端使用五项底部导航、卡片、抽屉和安全区适配。
 - **凭据与媒体地址隔离**：Cookie、签名 URL 和本地绝对路径不会回显到前端或写入普通日志。
 
 ## 技术栈
@@ -94,7 +94,7 @@
 - 技术分析：媒体参数、响度、静音、频谱、镜头、关键帧与时间线图表。
 - 内容分析：公开字幕、ASR、OCR、章节、关键词和带证据定位的摘要。
 - 任务中心：按视频聚合相关任务，查看阶段、进度、速度和失败原因；终态任务支持单项/批量删除，已有产物会转为可继续管理的受管保留文件。
-- 最近解析：每条记录提供独立删除入口；有关联任务或分析的数据会被安全阻止删除。
+- 最近解析：独立页面以紧凑横向条目展示历史记录，每条记录提供独立删除入口；有关联任务或分析的数据会被安全阻止删除。
 - 产物中心：默认按视频标题折叠展示产物数量、总大小、类型和最新时间，展开后可预览、保存、单项/批量删除并跳转官方源视频。
 
 ## 系统架构
@@ -158,14 +158,14 @@ echo "$CR_PAT" | docker login ghcr.io -u JunWan666 --password-stdin
 
 ### 一键下载 Compose 文件
 
-下面的命令会从 GitHub `v1.2.1` Release 对应的源码标签下载 Compose 文件和 GHCR 配置，不需要克隆整个仓库。当前仓库为私有仓库，先准备一个同时拥有仓库读取权限和 `read:packages` 权限的 GitHub Token：
+下面的命令会从 GitHub `v1.2.2` Release 对应的源码标签下载 Compose 文件和 GHCR 配置，不需要克隆整个仓库。当前仓库为私有仓库，先准备一个同时拥有仓库读取权限和 `read:packages` 权限的 GitHub Token：
 
 Linux/macOS：
 
 ```bash
 export GITHUB_TOKEN=ghp_your_token
-curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.1/docker-compose.yml -o docker-compose.yml
-curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.1/ghcr-compose.env -o .env
+curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.2/docker-compose.yml -o docker-compose.yml
+curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.2/ghcr-compose.env -o .env
 docker login ghcr.io
 docker compose pull
 docker compose up --detach --no-build --wait
@@ -175,8 +175,8 @@ Windows PowerShell：
 
 ```powershell
 $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN" }
-Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.1/docker-compose.yml -OutFile docker-compose.yml
-Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.1/ghcr-compose.env -OutFile .env
+Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.2/docker-compose.yml -OutFile docker-compose.yml
+Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.2/ghcr-compose.env -OutFile .env
 docker login ghcr.io
 docker compose pull
 docker compose up --detach --no-build --wait

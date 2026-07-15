@@ -22,6 +22,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '视频详情' },
   },
   {
+    path: '/recent',
+    name: 'recent',
+    component: () => import('@/views/RecentView.vue'),
+    meta: { title: '最近解析' },
+  },
+  {
     path: '/jobs',
     name: 'jobs',
     component: () => import('@/views/JobsView.vue'),

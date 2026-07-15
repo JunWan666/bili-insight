@@ -8,6 +8,7 @@ interface PageContract {
 
 const pageContracts: PageContract[] = [
   { path: '/', heading: '粘贴 Bilibili 视频链接' },
+  { path: '/recent', heading: '最近解析' },
   { path: '/videos/video-e2e', heading: 'E2E 测试专用：响应式视频解析样本' },
   { path: '/jobs', heading: '任务中心' },
   { path: '/artifacts', heading: '产物与历史' },
@@ -87,7 +88,8 @@ test('桌面工作区充分利用宽度且主要操作位于首屏', async ({ pa
 
   testApi.setAuthenticated(true)
   const contracts = [
-    { path: '/', view: '.home-view', primary: '.recent-section' },
+    { path: '/', view: '.home-view', primary: '.parse-panel' },
+    { path: '/recent', view: '.recent-view', primary: '.recent-card:first-of-type' },
     { path: '/jobs', view: '.jobs-view', primary: '.job-card:first-of-type' },
     { path: '/artifacts', view: '.artifacts-view', primary: '.artifact-content' },
     { path: '/settings', view: '.settings-view', primary: '.auth-actions' },
@@ -115,6 +117,22 @@ test('桌面工作区充分利用宽度且主要操作位于首屏', async ({ pa
     expect(box, `${contract.path} 的主要操作区应可测量`).not.toBeNull()
     expect(box?.y ?? viewportHeight, `${contract.path} 的主要操作区应在首屏开始`).toBeLessThan(viewportHeight)
   }
+
+  await page.goto('/')
+  await expect(page.locator('.sidebar')).toBeVisible()
+  await expect(page.getByTestId('sidebar-toggle')).toBeVisible()
+  const expandedLayout = await page.evaluate(() => ({
+    sidebarWidth: Math.round(document.querySelector<HTMLElement>('.sidebar')?.getBoundingClientRect().width ?? 0),
+    mainLeft: Math.round(document.querySelector<HTMLElement>('.main-content')?.getBoundingClientRect().left ?? 0),
+  }))
+  await page.getByTestId('sidebar-toggle').click()
+  await expect(page.locator('.sidebar')).toHaveClass(/is-collapsed/)
+  await expect.poll(async () => page.evaluate(() => ({
+    sidebarWidth: Math.round(document.querySelector<HTMLElement>('.sidebar')?.getBoundingClientRect().width ?? 0),
+    mainLeft: Math.round(document.querySelector<HTMLElement>('.main-content')?.getBoundingClientRect().left ?? 0),
+  }))).toEqual({ sidebarWidth: 84, mainLeft: 84 })
+  expect(expandedLayout.sidebarWidth).toBe(248)
+  expect(expandedLayout.mainLeft).toBe(248)
 
   await page.goto('/videos/video-e2e')
   await expect(page.locator('.workspace')).toBeVisible()
@@ -160,9 +178,16 @@ test('手机首屏展示链接输入、身份状态和解析操作', async ({ pa
     expect((box?.y ?? 0) + (box?.height ?? 0), `${name} 不应被底部导航遮挡`).toBeLessThanOrEqual(visibleBottom + 1)
   }
 
-  const nextSectionBox = await page.locator('.capabilities').boundingBox()
-  expect(nextSectionBox, '首屏之后的工作流内容应具有可测量区域').not.toBeNull()
-  expect(nextSectionBox?.y ?? 0, '下一段内容不应露在固定底部导航下方').toBeGreaterThanOrEqual(viewport?.height ?? 0)
+  const workflowBox = await page.locator('.workflow-copy').boundingBox()
+  expect(workflowBox, '工作流说明应具有可测量区域').not.toBeNull()
+  expect(workflowBox?.y ?? -1, '工作流说明不应位于首屏顶部之外').toBeGreaterThanOrEqual(0)
+  expect((workflowBox?.y ?? 0) + (workflowBox?.height ?? 0), '工作流说明不应被底部导航遮挡').toBeLessThanOrEqual(visibleBottom + 1)
+
+  const homeScroll = await page.evaluate(() => ({
+    clientHeight: document.documentElement.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+  }))
+  expect(homeScroll.scrollHeight, '解析首页应完整收在一个手机视口内').toBeLessThanOrEqual(homeScroll.clientHeight + 1)
 })
 
 test('触控视口的关键操作目标至少为 44×44 px', async ({ page }, testInfo) => {

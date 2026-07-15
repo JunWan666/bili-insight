@@ -113,9 +113,9 @@ export const useVideosStore = defineStore('videos', () => {
     }
   }
 
-  async function loadRecent(): Promise<void> {
+  async function loadRecent(limit = 8): Promise<void> {
     try {
-      recent.value = await videoApi.recent()
+      recent.value = await videoApi.recent(limit)
     } catch {
       recent.value = []
     }
