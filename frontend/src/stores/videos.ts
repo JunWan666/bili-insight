@@ -7,6 +7,7 @@ import type {
   RecentVideo,
   StreamCollection,
   StreamVerificationResult,
+  VideoBatchDeleteResult,
   VideoDetail,
 } from '@/types/api'
 
@@ -120,6 +121,26 @@ export const useVideosStore = defineStore('videos', () => {
     }
   }
 
+  async function removeRecent(videoId: string): Promise<void> {
+    await videoApi.remove(videoId)
+    recent.value = recent.value.filter((item) => item.id !== videoId)
+    if (current.value?.id === videoId) {
+      current.value = null
+      streams.value = null
+    }
+  }
+
+  async function removeRecentMany(videoIds: string[]): Promise<VideoBatchDeleteResult> {
+    const result = await videoApi.removeMany(videoIds)
+    const deletedIds = new Set(result.results.map((item) => item.id))
+    recent.value = recent.value.filter((item) => !deletedIds.has(item.id))
+    if (current.value && deletedIds.has(current.value.id)) {
+      current.value = null
+      streams.value = null
+    }
+    return result
+  }
+
   function clearAuthenticatedContext(): void {
     if (streams.value?.accessModeUsed === 'authenticated') streams.value = null
     else if (streams.value) streams.value = { ...streams.value, authAvailable: false }
@@ -145,6 +166,8 @@ export const useVideosStore = defineStore('videos', () => {
     verifyStream,
     refresh,
     loadRecent,
+    removeRecent,
+    removeRecentMany,
     clearAuthenticatedContext,
   }
 })

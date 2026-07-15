@@ -410,6 +410,30 @@ test('任务中心使用服务端分页且活动任务同步不污染当前页',
   await expect(page.getByText('第 2 页 · 共 25 个任务')).toBeVisible()
 })
 
+test('任务中心支持选择终态任务并批量删除', async ({ page, testApi }) => {
+  testApi.setJobs([
+    { ...runningJob(), id: 'job-delete-one', status: 'completed', phase: 'completed', progress: 100, finishedAt: '2026-07-14T08:00:00.000Z' },
+    { ...runningJob(), id: 'job-delete-two', status: 'failed', phase: 'failed', progress: 70, finishedAt: '2026-07-14T08:00:00.000Z' },
+  ])
+  await page.goto('/jobs')
+  await activate(page.locator('.job-group-heading .el-checkbox').first(), page)
+  await expect(page.locator('.batch-bar')).toContainText('已选择 2 条任务')
+  await activate(page.locator('.batch-bar').getByRole('button', { name: '批量删除' }), page)
+  await page.locator('.el-message-box').getByRole('button', { name: '批量删除' }).click()
+  await expect.poll(() => testApi.state.jobBatchDeletions).toEqual([['job-delete-one', 'job-delete-two']])
+  await expect(page.getByTestId('job-card')).toHaveCount(0)
+})
+
+test('首页最近解析支持选择并批量删除', async ({ page, testApi }) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: '最近解析' })).toBeVisible()
+  await activate(page.locator('.recent-batch-actions .el-checkbox'), page)
+  await activate(page.getByRole('button', { name: '删除所选' }), page)
+  await page.locator('.el-message-box').getByRole('button', { name: '批量删除' }).click()
+  await expect.poll(() => testApi.state.videoBatchDeletions).toEqual([['video-e2e']])
+  await expect(page.getByRole('heading', { name: '最近解析' })).toHaveCount(0)
+})
+
 test('设置页可上传脱敏测试 Cookie 文件并彻底清除登录态', async ({ page, testApi }) => {
   await page.goto('/settings')
   await expect(page.getByRole('heading', { name: 'Cookie 登录态' })).toBeVisible()
@@ -451,6 +475,7 @@ test('设置页可上传脱敏测试 Cookie 文件并彻底清除登录态', asy
 
 test('产物删除前明确二次确认记录与文件范围', async ({ page, testApi }) => {
   await page.goto('/artifacts')
+  await activate(page.getByTestId('artifact-group-toggle').first(), page)
   await expect(page.getByText(/受管产物 16(?:\.0)? MB/)).toBeVisible()
   expect(testApi.state.unhandledRequests).not.toContain('GET /artifacts/storage')
   const viewport = page.viewportSize()
@@ -477,6 +502,7 @@ test('产物删除前明确二次确认记录与文件范围', async ({ page, te
 
 test('产物中心支持批量选择并彻底删除文件', async ({ page, testApi }) => {
   await page.goto('/artifacts')
+  await activate(page.getByTestId('artifact-group-toggle').first(), page)
   const viewport = page.viewportSize()
   const selection = viewport && viewport.width < 768
     ? page.locator('.mobile-artifacts .artifact-checkbox').first()

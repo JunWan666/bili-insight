@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-当前版本达到本地单用户/可信环境的 Production Ready 标准。本轮新增本机管理员登录、应用会话与 CSRF 保护、分析/下载任务复用、按视频任务分组、产物详情与批量管理、官方源链接和独立音频下载；完整 Playwright 矩阵、`0006_application_auth` Docker 迁移、真实 Cookie 4K Shaka 播放、Range 代理和安全审计均已复验通过。
+当前版本达到本地单用户/可信环境的 Production Ready 标准。`v1.2.0` 新增任务单项/批量删除、最近解析单项/批量删除，以及按视频标题折叠的产物中心；任务删除会把已有产物事务性转为受管保留文件，活动任务与有关联数据的视频记录会被安全阻止删除。
 
 ## 当前阶段
 
@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | 仓库与可运行骨架 | verified | Python/Node/FFmpeg 环境检查、开发脚本、CI、生产构建和健康检查通过 |
 | Provider、Cookie 与解析 | verified | 原 BV/AV 能力保持通过；新增 `ss/ep`、Season/Episode、PGC 匿名/登录/会员规格、Provider 隔离、特别篇稳定性和 Cookie 清除回归通过 |
-| 下载、任务与产物 | verified | DASH 下载、合并、FFprobe、暂停恢复、重试、伴随产物、Range 与删除测试通过 |
+| 下载、任务与产物 | verified | DASH 下载、合并、FFprobe、暂停恢复、重试、任务批量删除、最近解析安全删除、产物折叠分组、Range 与删除测试通过 |
 | 媒体与内容分析 | verified | 基础、媒体、音频、字幕、ASR/OCR 适配、镜头、摘要、编辑和导出链路通过 |
 | 在线播放预览 | verified | Shaka 组件、静态 SegmentBase MPD、同源 Range 代理、TTL/限额、强制刷新、登录态清理、安全故障注入及真实 4K 播放通过 |
 | Vue 页面与移动端 | verified | 六个核心页面保留；桌面全宽一屏工作区、预览弹窗和移动端遮挡修复通过完整跨浏览器矩阵 |
@@ -57,6 +57,9 @@
 | AC-MOBILE-04 | verified | 页面刷新、活动任务查询、SSE 断线轮询及 Worker 重启恢复 |
 | AC-MOBILE-05 | verified | 触控目标不小于 44×44 px，关键流程使用 tap 且不依赖 hover |
 | AC-MOBILE-06 | verified | 手机 Tooltip 遮挡播放按钮问题已修复，Chromium/WebKit 完整移动矩阵通过 |
+| AC-HISTORY-01 | verified | 终态任务单项/批量删除、活动任务 409、关联产物受管保留和分析记录清理测试 |
+| AC-HISTORY-02 | verified | 最近解析单项/批量删除、关联任务冲突和媒体流缓存清理测试 |
+| AC-HISTORY-03 | verified | 产物按视频默认折叠、展开明细、整组选中、桌面/移动删除及 44px 触控门禁 |
 | AC-SEC-01 | verified | SSRF、路径穿越、命令注入、文件名和 XSS 纯文本渲染测试 |
 | AC-SEC-02 | verified | CookieJar 域/path/secure 语义及 Bilibili 允许域发送测试 |
 | AC-SEC-03 | verified | Cookie 文件忽略、仓库扫描、日志/诊断/数据库脱敏和 E2E 假凭据检查 |
@@ -66,11 +69,11 @@
 
 | 门禁 | 当前结果 |
 | --- | --- |
-| 后端 Pytest | 488 passed，应用覆盖率 90%，高于 85% 门槛 |
+| 后端 Pytest | 491 passed，应用覆盖率 86.68%，高于 85% 门槛 |
 | 后端静态检查 | Ruff check、Ruff format check、mypy strict 全部通过 |
-| 前端单元测试 | 19 个文件、104 项 Vitest 全部通过 |
+| 前端单元测试 | 19 个文件、105 项 Vitest 全部通过 |
 | 前端静态与构建 | ESLint、Vue/TypeScript typecheck、Vite production build 全部通过 |
-| 完整 Playwright 矩阵 | 175 项：160 passed、15 项按设备能力预期 skipped；Chromium 手机/平板/桌面、WebKit 手机/桌面和 Firefox 桌面 0 failed |
+| 完整 Playwright 矩阵 | 189 项：174 passed、15 项按设备能力预期 skipped；Chromium 手机/平板/桌面、WebKit 手机/桌面和 Firefox 桌面 0 failed |
 | Docker 与迁移 | 最终源码已在 CI 中构建前后端生产镜像并完成 Compose 启动、健康与持久化验收；本机两个容器 healthy，Alembic 为 `0006_application_auth (head)` |
 | 真实番剧播放 | `ss28747` 年度大会员解析得到 19 路视频、3 路音频；4K H.264 + AAC 在 Chromium 中实际播放、暂停和拖动通过 |
 | 依赖与仓库安全 | Python 两组 `pip-audit` 无已知漏洞；npm 官方 registry 审计 0 vulnerabilities；仓库凭据扫描通过 |
@@ -85,7 +88,7 @@
 | 前端单元测试 | 18 个文件、81 项 Vitest 全部通过（本轮修改前基线） |
 | 前端静态与构建 | ESLint、Vue/TypeScript typecheck、Vite production build 全部通过 |
 | 主动流探测专项 | 后端 API/健康 15 项、前端 14 项单测及桌面/移动 Chromium E2E 2 项通过 |
-| Playwright 全套 | 140 项：129 passed、11 项按设备能力预期 skipped；0 failed |
+| Playwright 全套 | 189 项：174 passed、15 项按设备能力预期 skipped；0 failed |
 | Playwright 通道 | 本机 Chrome/Edge 40 项：34 passed、6 项桌面触控预期 skipped |
 | 移动端专项 | Chromium 360/390 与 WebKit 390 共 60 项全部通过 |
 | 依赖安全 | `pip-audit` 无已知漏洞；npm 官方审计 0 vulnerabilities |

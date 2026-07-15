@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bili-insight-backend"
-version = "1.1.0"
+version = "1.2.0"
 description = "Secure FastAPI backend for Bilibili video parsing, analysis, and downloads"
 requires-python = ">=3.12"
 dependencies = [

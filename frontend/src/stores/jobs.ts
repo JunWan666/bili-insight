@@ -14,6 +14,7 @@ import type {
   DownloadCreationResult,
   Job,
   JobEvent,
+  JobBatchDeleteResult,
   JobFilters,
 } from '@/types/api'
 
@@ -312,6 +313,24 @@ export const useJobsStore = defineStore('jobs', () => {
     track(await jobApi.resume(jobId))
   }
 
+  async function remove(jobId: string): Promise<void> {
+    await jobApi.remove(jobId)
+    items.value = items.value.filter((item) => item.id !== jobId)
+    activeJobs.value = activeJobs.value.filter((item) => item.id !== jobId)
+    total.value = Math.max(0, total.value - 1)
+    disconnect(jobId)
+  }
+
+  async function removeMany(jobIds: string[]): Promise<JobBatchDeleteResult> {
+    const result = await jobApi.removeMany(jobIds)
+    const deletedIds = new Set(result.results.map((item) => item.id))
+    items.value = items.value.filter((item) => !deletedIds.has(item.id))
+    activeJobs.value = activeJobs.value.filter((item) => !deletedIds.has(item.id))
+    total.value = Math.max(0, total.value - result.deletedCount)
+    for (const jobId of deletedIds) disconnect(jobId)
+    return result
+  }
+
   function dispose(): void {
     for (const source of sources.values()) source.close()
     sources.clear()
@@ -341,6 +360,8 @@ export const useJobsStore = defineStore('jobs', () => {
     retry,
     pause,
     resume,
+    remove,
+    removeMany,
     dispose,
   }
 })

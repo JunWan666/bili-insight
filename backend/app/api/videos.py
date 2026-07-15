@@ -14,6 +14,9 @@ from app.schemas.video import (
     StreamsRead,
     StreamVerificationRead,
     VerifyStreamRequest,
+    VideoBatchDeleteRequest,
+    VideoBatchDeleteResponse,
+    VideoDeleteResponse,
     VideoPartRead,
     VideoRead,
 )
@@ -42,6 +45,14 @@ async def list_recent_videos(
     return await service.list_recent(limit)
 
 
+@router.post("/batch-delete", response_model=VideoBatchDeleteResponse)
+async def delete_videos(
+    payload: VideoBatchDeleteRequest,
+    service: VideoService = Depends(get_video_service),
+) -> VideoBatchDeleteResponse:
+    return await service.delete_many(payload.video_ids)
+
+
 @router.post("/streams/{stream_id}/verify", response_model=StreamVerificationRead)
 async def verify_stream(
     stream_id: str,
@@ -57,6 +68,14 @@ async def get_video(
     service: VideoService = Depends(get_video_service),
 ) -> VideoRead:
     return await service.get_video(video_id)
+
+
+@router.delete("/{video_id}", response_model=VideoDeleteResponse)
+async def delete_video(
+    video_id: str,
+    service: VideoService = Depends(get_video_service),
+) -> VideoDeleteResponse:
+    return await service.delete(video_id)
 
 
 @router.get("/{video_id}/parts", response_model=list[VideoPartRead])

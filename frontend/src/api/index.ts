@@ -42,6 +42,8 @@ import type {
   DownloadCreationResult,
   DownloadBatchCreationResult,
   Job,
+  JobBatchDeleteResult,
+  JobDeleteResult,
   JobFilters,
   PageResult,
   ParsedVideoResult,
@@ -51,6 +53,8 @@ import type {
   StreamVerificationResult,
   StorageStatus,
   VideoDetail,
+  VideoBatchDeleteResult,
+  VideoDeleteResult,
 } from '@/types/api'
 
 export const appAuthApi = {
@@ -119,6 +123,14 @@ export const videoApi = {
   async recent(limit = 8): Promise<RecentVideo[]> {
     const { data } = await http.get<RecentVideo[] | { items: RecentVideo[] }>('/videos', { params: { limit } })
     return Array.isArray(data) ? data : data.items
+  },
+  async remove(videoId: string): Promise<VideoDeleteResult> {
+    const { data } = await http.delete<VideoDeleteResult>(`/videos/${encodeURIComponent(videoId)}`)
+    return data
+  },
+  async removeMany(videoIds: string[]): Promise<VideoBatchDeleteResult> {
+    const { data } = await http.post<VideoBatchDeleteResult>('/videos/batch-delete', { videoIds })
+    return data
   },
 }
 
@@ -202,6 +214,14 @@ export const jobApi = {
   async resume(jobId: string): Promise<Job> {
     const { data } = await http.post<unknown>(`/jobs/${encodeURIComponent(jobId)}/resume`)
     return normalizeJob(unwrap(data))
+  },
+  async remove(jobId: string): Promise<JobDeleteResult> {
+    const { data } = await http.delete<JobDeleteResult>(`/jobs/${encodeURIComponent(jobId)}`)
+    return data
+  },
+  async removeMany(jobIds: string[]): Promise<JobBatchDeleteResult> {
+    const { data } = await http.post<JobBatchDeleteResult>('/jobs/batch-delete', { jobIds })
+    return data
   },
 }
 

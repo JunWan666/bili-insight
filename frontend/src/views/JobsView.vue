@@ -7,6 +7,7 @@ import {
   Clock,
   Connection,
   Document,
+  Delete,
   Download,
   Files,
   InfoFilled,
@@ -35,6 +36,8 @@ const currentPage = ref(1)
 const currentPageSize = ref(20)
 const busyJobId = ref<string | null>(null)
 const expanded = ref<string[]>([])
+const selectedIds = ref<string[]>([])
+const terminalStatuses = new Set<JobStatus>(['completed', 'failed', 'canceled'])
 
 const summary = computed(() => ({
   active: jobs.activeJobs.filter((job) => job.status !== 'paused').length,
@@ -60,6 +63,7 @@ const groupedJobs = computed(() => {
   }
   return [...groups.values()]
 })
+const selectedJobs = computed(() => jobs.items.filter((job) => selectedIds.value.includes(job.id)))
 
 const statusOptions: Array<{ value: typeof statusFilter.value; label: string }> = [
   { value: 'all', label: '全部状态' },
@@ -122,6 +126,38 @@ function companionNames(job: Job, outcome: 'failed' | 'not_available'): string[]
     .map(([type]) => companionLabels[type as keyof typeof companionLabels])
 }
 
+function canDelete(job: Job): boolean {
+  return terminalStatuses.has(job.status)
+}
+
+function toggleJob(job: Job, selected: boolean): void {
+  if (!canDelete(job)) return
+  selectedIds.value = selected
+    ? Array.from(new Set([...selectedIds.value, job.id]))
+    : selectedIds.value.filter((id) => id !== job.id)
+}
+
+function deletableJobs(group: { jobs: Job[] }): Job[] {
+  return group.jobs.filter(canDelete)
+}
+
+function groupSelected(group: { jobs: Job[] }): boolean {
+  const candidates = deletableJobs(group)
+  return candidates.length > 0 && candidates.every((job) => selectedIds.value.includes(job.id))
+}
+
+function groupIndeterminate(group: { jobs: Job[] }): boolean {
+  const selectedCount = deletableJobs(group).filter((job) => selectedIds.value.includes(job.id)).length
+  return selectedCount > 0 && selectedCount < deletableJobs(group).length
+}
+
+function toggleGroup(group: { jobs: Job[] }, selected: boolean): void {
+  const ids = deletableJobs(group).map((job) => job.id)
+  selectedIds.value = selected
+    ? Array.from(new Set([...selectedIds.value, ...ids]))
+    : selectedIds.value.filter((id) => !ids.includes(id))
+}
+
 async function cancel(job: Job): Promise<void> {
   try {
     await ElMessageBox.confirm(`确定取消“${job.videoTitle || typeView[job.type].label}”吗？已完成的有效产物会保留，半成品不会进入产物列表。`, '取消任务', { type: 'warning', confirmButtonText: '取消任务', cancelButtonText: '继续执行' })
@@ -154,6 +190,43 @@ async function resume(job: Job): Promise<void> {
   finally { busyJobId.value = null }
 }
 
+async function removeJob(job: Job): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `删除“${job.videoTitle || typeView[job.type].label}”的这条任务记录？关联产物会转为受管保留文件，仍可在产物中心下载或彻底删除；关联分析记录会一并清理。`,
+      '删除任务',
+      { type: 'warning', confirmButtonText: '删除任务', cancelButtonText: '取消' },
+    )
+    busyJobId.value = job.id
+    await jobs.remove(job.id)
+    selectedIds.value = selectedIds.value.filter((id) => id !== job.id)
+    ElMessage.success('任务记录已删除，已有产物已转为受管保留')
+    if (!jobs.items.length && currentPage.value > 1) currentPage.value -= 1
+    await loadJobs()
+  } catch (reason) {
+    if (reason !== 'cancel' && reason !== 'close') ElMessage.error(reason instanceof Error ? reason.message : '删除任务失败')
+  } finally { busyJobId.value = null }
+}
+
+async function removeSelected(): Promise<void> {
+  if (!selectedJobs.value.length) return
+  try {
+    await ElMessageBox.confirm(
+      `删除选中的 ${selectedJobs.value.length} 条终态任务？任务产物会转为受管保留文件，关联分析记录会一并清理。`,
+      '批量删除任务',
+      { type: 'warning', confirmButtonText: '批量删除', cancelButtonText: '取消' },
+    )
+    const result = await jobs.removeMany(selectedIds.value)
+    selectedIds.value = result.failedIds
+    if (result.failedIds.length) ElMessage.warning(`已删除 ${result.deletedCount} 条，${result.failedIds.length} 条未能删除`)
+    else ElMessage.success(`已删除 ${result.deletedCount} 条任务记录`)
+    if (!jobs.items.length && currentPage.value > 1) currentPage.value -= 1
+    await loadJobs()
+  } catch (reason) {
+    if (reason !== 'cancel' && reason !== 'close') ElMessage.error(reason instanceof Error ? reason.message : '批量删除任务失败')
+  }
+}
+
 function toggleDetails(id: string): void {
   expanded.value = expanded.value.includes(id) ? expanded.value.filter((item) => item !== id) : [...expanded.value, id]
 }
@@ -169,6 +242,7 @@ async function loadJobs(resetPage = false): Promise<void> {
   })
   currentPage.value = jobs.page
   currentPageSize.value = jobs.pageSize
+  selectedIds.value = selectedIds.value.filter((id) => jobs.items.some((job) => job.id === id && canDelete(job)))
 }
 
 async function refreshAll(): Promise<void> {
@@ -209,14 +283,29 @@ onMounted(() => void refreshAll())
 
     <RequestError v-if="jobs.error" class="jobs-error" :error="jobs.error" @retry="loadJobs()" />
 
+    <section v-if="selectedIds.length" class="batch-bar surface-card">
+      <strong>已选择 {{ selectedIds.length }} 条任务</strong>
+      <span>仅终态任务可删除</span>
+      <el-button type="danger" plain :icon="Delete" @click="removeSelected">批量删除</el-button>
+      <el-button text @click="selectedIds = []">取消选择</el-button>
+    </section>
+
     <section v-loading="jobs.loading && !jobs.items.length" class="job-list">
       <section v-for="group in groupedJobs" :key="group.key" class="job-group">
         <header class="job-group-heading">
-          <div><strong>{{ group.title }}</strong><span>{{ group.jobs.length }} 个相关任务</span></div>
+          <el-checkbox
+            :model-value="groupSelected(group)"
+            :indeterminate="groupIndeterminate(group)"
+            :disabled="!deletableJobs(group).length"
+            :aria-label="`选择 ${group.title} 的可删除任务`"
+            @change="toggleGroup(group, Boolean($event))"
+          />
+          <div><strong>{{ group.title }}</strong><span>{{ group.jobs.length }} 个相关任务 · {{ deletableJobs(group).length }} 个可删除</span></div>
           <a v-if="group.sourceUrl" :href="group.sourceUrl" target="_blank" rel="noopener noreferrer"><el-icon><Link /></el-icon>官方源视频</a>
         </header>
       <article v-for="job in group.jobs" :key="job.id" class="job-card surface-card" data-testid="job-card">
         <div class="job-top">
+          <el-checkbox class="job-checkbox" :model-value="selectedIds.includes(job.id)" :disabled="!canDelete(job)" :aria-label="`选择任务 ${job.videoTitle || job.id}`" @change="toggleJob(job, Boolean($event))" />
           <span class="type-icon"><el-icon><component :is="typeView[job.type]?.icon || MoreFilled" /></el-icon></span>
           <div class="job-title"><span><el-tag size="small" effect="plain" :type="statusView[job.status].type"><el-icon><component :is="statusView[job.status].icon" /></el-icon>{{ statusView[job.status].label }}</el-tag><small>{{ typeView[job.type]?.label || job.type }}</small></span><h2>{{ job.videoTitle || typeView[job.type]?.label || '后台任务' }}</h2><p>{{ job.partTitle || '任务级操作' }}</p></div>
           <div class="job-times"><small>创建于 {{ formatDate(job.createdAt) }}</small><small v-if="job.finishedAt">完成于 {{ formatDate(job.finishedAt) }}</small></div>
@@ -245,6 +334,7 @@ onMounted(() => void refreshAll())
             <el-button v-if="['queued', 'preparing', 'running', 'post_processing', 'paused'].includes(job.status)" type="danger" plain :icon="CircleClose" :loading="busyJobId === job.id" @click="cancel(job)">取消</el-button>
             <el-button v-if="job.status === 'failed'" type="primary" :icon="RefreshLeft" :loading="busyJobId === job.id" @click="retry(job)">失败重试</el-button>
             <el-button v-if="job.status === 'completed' && job.artifactIds.length" type="primary" plain :icon="Files" @click="$router.push({ name: 'artifacts', query: { jobId: job.id } })">查看产物</el-button>
+            <el-button v-if="canDelete(job)" type="danger" plain :icon="Delete" :loading="busyJobId === job.id" @click="removeJob(job)">删除</el-button>
           </div>
         </div>
       </article>
@@ -284,10 +374,11 @@ onMounted(() => void refreshAll())
 .filter-controls { display: flex; gap: 8px; }.filter-controls .el-select { width: 180px; min-height: 44px; }.filter-controls :deep(.el-select__wrapper) { min-height: 44px; }
 .filter-bar > span { padding-right: 8px; color: var(--text-tertiary); font-size: 12px; }
 .jobs-error { margin-bottom: 15px; }
+.batch-bar { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; padding: 9px 12px; }.batch-bar > span { margin-right: auto; color: var(--text-tertiary); font-size: 11px; }
 .job-list { display: grid; gap: 10px; min-height: 240px; }
-.job-group { display: grid; gap: 8px; }.job-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 4px 1px; }.job-group-heading strong, .job-group-heading span { display: block; }.job-group-heading span { margin-top: 2px; color: var(--text-tertiary); font-size: 10px; }.job-group-heading a { display: inline-flex; align-items: center; gap: 5px; color: var(--brand); font-size: 11px; font-weight: 650; text-decoration: none; }
+.job-group { display: grid; gap: 8px; }.job-group-heading { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 4px 4px 1px; }.job-group-heading strong, .job-group-heading span { display: block; }.job-group-heading span { margin-top: 2px; color: var(--text-tertiary); font-size: 10px; }.job-group-heading a { display: inline-flex; align-items: center; gap: 5px; color: var(--brand); font-size: 11px; font-weight: 650; text-decoration: none; }
 .job-card { padding: 16px; }
-.job-top { display: grid; grid-template-columns: auto 1fr auto; gap: 13px; align-items: start; }
+.job-top { display: grid; grid-template-columns: auto auto 1fr auto; gap: 13px; align-items: start; }.job-checkbox { padding-top: 11px; }
 .type-icon { display: grid; place-items: center; width: 43px; height: 43px; border-radius: 12px; background: var(--brand-soft); color: var(--brand); }.type-icon .el-icon { font-size: 21px; }
 .job-title { min-width: 0; }.job-title > span { display: flex; align-items: center; gap: 8px; }.job-title > span small { color: var(--text-tertiary); }.job-title h2 { margin: 8px 0 2px; font-size: 16px; overflow-wrap: anywhere; }.job-title p { margin: 0; color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
 .job-times { display: grid; justify-items: end; gap: 4px; color: var(--text-tertiary); font-size: 10px; }
@@ -307,9 +398,10 @@ onMounted(() => void refreshAll())
 }
 
 @media (max-width: 767px) {
+  .batch-bar { position: sticky; top: 72px; z-index: 8; display: grid; grid-template-columns: 1fr 1fr; }.batch-bar strong, .batch-bar > span { grid-column: 1 / -1; }.batch-bar .el-button { min-height: 44px; margin: 0; }
   .summary-grid { grid-template-columns: 1fr 1fr; gap: 9px; }.summary-grid article { padding: 13px; }.summary-icon { width: 37px; height: 37px; }
   .filter-bar { display: block; padding: 8px; }.filter-controls { display: grid; grid-template-columns: 1fr 1fr; }.filter-controls .el-select { width: 100%; }.filter-bar > span { display: block; padding: 9px 4px 1px; }
-  .job-card { padding: 15px; }.job-top { grid-template-columns: auto 1fr; }.job-times { grid-column: 2; justify-items: start; }
+  .job-card { padding: 15px; }.job-top { grid-template-columns: auto auto minmax(0, 1fr); }.job-times { grid-column: 3; justify-items: start; }.job-checkbox { padding-top: 11px; }
   .job-actions { display: grid; grid-template-columns: 1fr; }.job-actions > .el-button { justify-self: start; }.job-actions > div { display: grid; grid-template-columns: 1fr 1fr; }.job-actions > div .el-button { min-height: 44px; margin: 0; }
   .job-details dl { grid-template-columns: 1fr; }
   .pagination { justify-content: center; overflow-x: auto; }

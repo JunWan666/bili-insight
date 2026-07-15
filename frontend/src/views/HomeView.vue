@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowRight,
   Check,
@@ -20,7 +20,7 @@ import AuthStatusBadge from '@/components/AuthStatusBadge.vue'
 import RequestError from '@/components/RequestError.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useVideosStore } from '@/stores/videos'
-import type { AccessMode } from '@/types/api'
+import type { AccessMode, RecentVideo } from '@/types/api'
 import { formatDate, formatDuration } from '@/utils/format'
 import { normalizeVideoInput, VideoInputError } from '@/utils/videoUrl'
 
@@ -30,6 +30,8 @@ const videos = useVideosStore()
 const input = ref('')
 const accessMode = ref<AccessMode>('auto')
 const validationMessage = ref('')
+const selectedRecentIds = ref<string[]>([])
+const deletingRecent = ref(false)
 
 const modes: Array<{ value: AccessMode; title: string; description: string }> = [
   { value: 'auto', title: '自动', description: '先匿名解析，可手动补充登录画质' },
@@ -38,6 +40,8 @@ const modes: Array<{ value: AccessMode; title: string; description: string }> = 
 ]
 
 const canUseAuthenticated = computed(() => auth.isAuthenticated)
+const allRecentSelected = computed(() => videos.recent.length > 0 && videos.recent.every((video) => selectedRecentIds.value.includes(video.id)))
+const someRecentSelected = computed(() => selectedRecentIds.value.length > 0 && !allRecentSelected.value)
 
 async function pasteFromClipboard(): Promise<void> {
   try {
@@ -80,6 +84,50 @@ async function parseVideo(): Promise<void> {
 function selectMode(mode: AccessMode): void {
   accessMode.value = mode
   validationMessage.value = ''
+}
+
+function toggleRecent(video: RecentVideo, selected: boolean): void {
+  selectedRecentIds.value = selected
+    ? Array.from(new Set([...selectedRecentIds.value, video.id]))
+    : selectedRecentIds.value.filter((id) => id !== video.id)
+}
+
+function toggleAllRecent(selected: boolean): void {
+  selectedRecentIds.value = selected ? videos.recent.map((video) => video.id) : []
+}
+
+async function removeRecent(video: RecentVideo): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `从最近解析中删除“${video.title}”？仅无关联任务和分析记录的视频可以删除。`,
+      '删除解析记录',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+    )
+    deletingRecent.value = true
+    await videos.removeRecent(video.id)
+    selectedRecentIds.value = selectedRecentIds.value.filter((id) => id !== video.id)
+    ElMessage.success('最近解析记录已删除')
+  } catch (reason) {
+    if (reason !== 'cancel' && reason !== 'close') ElMessage.error(reason instanceof Error ? reason.message : '删除解析记录失败')
+  } finally { deletingRecent.value = false }
+}
+
+async function removeSelectedRecent(): Promise<void> {
+  if (!selectedRecentIds.value.length) return
+  try {
+    await ElMessageBox.confirm(
+      `删除选中的 ${selectedRecentIds.value.length} 条最近解析记录？有关联任务或分析的记录会保留并标记为删除失败。`,
+      '批量删除解析记录',
+      { type: 'warning', confirmButtonText: '批量删除', cancelButtonText: '取消' },
+    )
+    deletingRecent.value = true
+    const result = await videos.removeRecentMany(selectedRecentIds.value)
+    selectedRecentIds.value = result.failedIds
+    if (result.failedIds.length) ElMessage.warning(`已删除 ${result.deletedCount} 条，${result.failedIds.length} 条有关联数据未删除`)
+    else ElMessage.success(`已删除 ${result.deletedCount} 条最近解析记录`)
+  } catch (reason) {
+    if (reason !== 'cancel' && reason !== 'close') ElMessage.error(reason instanceof Error ? reason.message : '批量删除解析记录失败')
+  } finally { deletingRecent.value = false }
 }
 
 onMounted(() => {
@@ -162,9 +210,14 @@ onMounted(() => {
     <section v-if="videos.recent.length" class="recent-section">
       <div class="section-heading">
         <div><h2>最近解析</h2><p>继续查看此前解析的视频和分 P。</p></div>
+        <div class="recent-batch-actions">
+          <el-checkbox :model-value="allRecentSelected" :indeterminate="someRecentSelected" @change="toggleAllRecent(Boolean($event))">全选</el-checkbox>
+          <el-button v-if="selectedRecentIds.length" type="danger" plain :icon="Delete" :loading="deletingRecent" @click="removeSelectedRecent">删除所选</el-button>
+        </div>
       </div>
       <div class="recent-grid">
         <article v-for="video in videos.recent" :key="video.id" class="recent-card surface-card">
+          <el-checkbox class="recent-checkbox" :model-value="selectedRecentIds.includes(video.id)" :aria-label="`选择 ${video.title}`" @change="toggleRecent(video, Boolean($event))" />
           <RouterLink :to="`/videos/${video.id}`" class="recent-main">
           <div class="recent-cover">
             <img :src="video.coverUrl" :alt="`${video.title} 封面`" loading="lazy" referrerpolicy="no-referrer" />
@@ -176,7 +229,7 @@ onMounted(() => {
             <small><el-icon><Clock /></el-icon>{{ formatDate(video.parsedAt) }}</small>
           </div>
           </RouterLink>
-          <a class="recent-source" :href="video.normalizedUrl" target="_blank" rel="noopener noreferrer">官方源视频</a>
+          <div class="recent-actions"><a class="recent-source" :href="video.normalizedUrl" target="_blank" rel="noopener noreferrer">官方源视频</a><el-button text type="danger" :icon="Delete" :loading="deletingRecent" aria-label="删除解析记录" @click="removeRecent(video)" /></div>
         </article>
       </div>
     </section>
@@ -236,10 +289,11 @@ onMounted(() => {
 .section-heading { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 16px; }
 .section-heading h2 { margin: 4px 0 0; font-size: 24px; letter-spacing: 0; }
 .section-heading p { margin: 5px 0 0; color: var(--text-secondary); }
+.recent-batch-actions { display: flex; align-items: center; gap: 10px; }
 .recent-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.recent-card { overflow: hidden; color: inherit; text-decoration: none; transition: transform .16s, box-shadow .16s; }
+.recent-card { position: relative; overflow: hidden; color: inherit; text-decoration: none; transition: transform .16s, box-shadow .16s; }.recent-checkbox { position: absolute; z-index: 2; top: 10px; left: 10px; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 7px; background: rgba(255, 255, 255, .92); }
 .recent-main { display: block; color: inherit; text-decoration: none; }
-.recent-source { display: block; margin: -5px 14px 13px; color: var(--brand); font-size: 11px; font-weight: 650; text-decoration: none; }
+.recent-actions { display: flex; align-items: center; justify-content: space-between; min-height: 42px; padding: 0 8px 4px 14px; }.recent-source { color: var(--brand); font-size: 11px; font-weight: 650; text-decoration: none; }
 .recent-card:hover { transform: translateY(-2px); box-shadow: 0 11px 30px rgba(31, 36, 51, .1); }
 .recent-cover { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: var(--surface-muted); }
 .recent-cover img { width: 100%; height: 100%; object-fit: cover; }
@@ -303,6 +357,7 @@ onMounted(() => {
   .mode-options button { min-height: 70px; align-items: center; }
   .mode-options strong { margin-bottom: 2px; }
   .recent-section, .capabilities { padding: 30px 0; }
+  .recent-section .section-heading { align-items: flex-end; }.recent-batch-actions { flex-direction: column; align-items: flex-end; }
   .recent-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .recent-body { padding: 11px; }
   .capability-grid { grid-template-columns: 1fr; }

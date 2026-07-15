@@ -89,6 +89,28 @@ class RecentVideoRead(CamelModel):
     normalized_url: str
 
 
+class VideoDeleteResponse(CamelModel):
+    id: str
+    deleted: bool
+
+
+class VideoBatchDeleteRequest(CamelModel):
+    video_ids: list[str] = Field(min_length=1, max_length=100)
+
+    @field_validator("video_ids")
+    @classmethod
+    def unique_videos(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("video IDs must be unique")
+        return values
+
+
+class VideoBatchDeleteResponse(CamelModel):
+    results: list[VideoDeleteResponse]
+    failed_ids: list[str]
+    deleted_count: int = Field(ge=0)
+
+
 class MediaStreamRead(CamelModel):
     id: str
     kind: StreamKind

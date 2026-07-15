@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Calendar,
+  ArrowDown,
+  ArrowRight,
   Delete,
   Document,
   Download,
@@ -41,7 +43,18 @@ const detailLoading = ref(false)
 const textPreview = ref('')
 const disk = ref<StorageStatus | null>(null)
 const selectedIds = ref<string[]>([])
+const expandedGroups = ref<string[]>([])
 let searchTimer: number | null = null
+
+interface ArtifactGroup {
+  key: string
+  title: string
+  sourceUrl: string | null
+  artifacts: Artifact[]
+  totalSize: number
+  latestCreatedAt: string
+  typeLabels: string[]
+}
 
 const types: Array<{ value: ArtifactType; label: string; icon: typeof Film }> = [
   { value: 'video', label: '视频', icon: Film },
@@ -89,6 +102,32 @@ const jobStatusMap: Record<JobStatus, { label: string; type: 'primary' | 'succes
 const usedBytes = computed(() => disk.value ? Math.max(0, disk.value.totalBytes - disk.value.freeBytes) : 0)
 const usagePercent = computed(() => disk.value?.totalBytes ? Math.round((usedBytes.value / disk.value.totalBytes) * 100) : 0)
 const selectedArtifacts = computed(() => artifacts.value.filter((item) => selectedIds.value.includes(item.id)))
+const artifactGroups = computed<ArtifactGroup[]>(() => {
+  const groups = new Map<string, ArtifactGroup>()
+  for (const artifact of artifacts.value) {
+    const key = artifact.videoId || 'independent-retained'
+    const existing = groups.get(key)
+    const typeLabel = typeMap[artifact.type]?.label || artifact.type
+    if (existing) {
+      existing.artifacts.push(artifact)
+      existing.totalSize += artifact.size
+      if (artifact.createdAt > existing.latestCreatedAt) existing.latestCreatedAt = artifact.createdAt
+      if (!existing.sourceUrl && artifact.sourceUrl) existing.sourceUrl = artifact.sourceUrl
+      if (!existing.typeLabels.includes(typeLabel)) existing.typeLabels.push(typeLabel)
+      continue
+    }
+    groups.set(key, {
+      key,
+      title: artifact.videoId ? (artifact.videoTitle || '未命名视频') : '独立 / 受管保留产物',
+      sourceUrl: artifact.sourceUrl,
+      artifacts: [artifact],
+      totalSize: artifact.size,
+      latestCreatedAt: artifact.createdAt,
+      typeLabels: [typeLabel],
+    })
+  }
+  return [...groups.values()]
+})
 
 function analysisContext(artifact: Artifact): string | null {
   const media = artifact.mediaInfo
@@ -159,14 +198,36 @@ function downloadArtifact(artifact: Artifact): void {
   anchor.remove()
 }
 
-function selectRows(rows: Artifact[]): void {
-  selectedIds.value = rows.map((item) => item.id)
-}
-
 function toggleArtifact(artifact: Artifact, selected: boolean): void {
   selectedIds.value = selected
     ? Array.from(new Set([...selectedIds.value, artifact.id]))
     : selectedIds.value.filter((id) => id !== artifact.id)
+}
+
+function isGroupExpanded(group: ArtifactGroup): boolean {
+  return expandedGroups.value.includes(group.key)
+}
+
+function toggleGroup(group: ArtifactGroup): void {
+  expandedGroups.value = isGroupExpanded(group)
+    ? expandedGroups.value.filter((key) => key !== group.key)
+    : [...expandedGroups.value, group.key]
+}
+
+function groupSelected(group: ArtifactGroup): boolean {
+  return group.artifacts.every((artifact) => selectedIds.value.includes(artifact.id))
+}
+
+function groupIndeterminate(group: ArtifactGroup): boolean {
+  const count = group.artifacts.filter((artifact) => selectedIds.value.includes(artifact.id)).length
+  return count > 0 && count < group.artifacts.length
+}
+
+function toggleGroupSelection(group: ArtifactGroup, selected: boolean): void {
+  const ids = group.artifacts.map((artifact) => artifact.id)
+  selectedIds.value = selected
+    ? Array.from(new Set([...selectedIds.value, ...ids]))
+    : selectedIds.value.filter((id) => !ids.includes(id))
 }
 
 function downloadSelected(): void {
@@ -270,27 +331,42 @@ onMounted(() => { void loadArtifacts(); void loadDisk() })
     </section>
 
     <section v-loading="loading" class="artifact-content surface-card">
-      <div v-if="artifacts.length" class="desktop-artifacts">
-        <el-table :data="artifacts" row-key="id" @selection-change="selectRows">
-          <el-table-column type="selection" width="48" />
-          <el-table-column label="产物" min-width="320">
-            <template #default="{ row }"><div class="artifact-name"><span><el-icon><component :is="typeMap[row.type]?.icon || Files" /></el-icon></span><div><strong>{{ row.filename }}</strong><small>{{ row.retained ? (row.protected ? '用户受管保留' : '历史已清理 · 文件受管保留') : (row.videoTitle || '独立产物') }}</small><small v-if="analysisContext(row)" class="analysis-context">{{ analysisContext(row) }}</small></div></div></template>
-          </el-table-column>
-          <el-table-column label="类型" width="110"><template #default="{ row }"><el-tag effect="plain" type="info">{{ typeMap[row.type]?.label || row.type }}</el-tag></template></el-table-column>
-          <el-table-column label="任务状态" width="125"><template #default="{ row }"><el-tag v-if="row.retained" effect="plain" type="warning">受管保留</el-tag><el-tag v-else-if="row.jobStatus" effect="plain" :type="jobStatusMap[row.jobStatus].type">{{ jobStatusMap[row.jobStatus].label }}</el-tag><span v-else>暂无</span></template></el-table-column>
-          <el-table-column label="文件信息" min-width="160"><template #default="{ row }">{{ formatBytes(row.size) }}<small class="cell-sub">{{ row.mediaInfo?.container || row.mimeType }}<template v-if="row.mediaInfo?.duration"> · {{ formatDuration(row.mediaInfo.duration) }}</template></small></template></el-table-column>
-          <el-table-column label="创建时间" min-width="150"><template #default="{ row }">{{ formatDate(row.createdAt) }}<small class="cell-sub">{{ row.expiresAt ? `清理于 ${formatDate(row.expiresAt)}` : '手动保留' }}</small></template></el-table-column>
-          <el-table-column label="操作" width="236" fixed="right"><template #default="{ row }"><el-button text :icon="View" @click="openDetails(row)">详情</el-button><el-button text type="primary" :icon="Download" @click="downloadArtifact(row)">保存</el-button><el-button text type="danger" :icon="Delete" @click="removeArtifact(row)" /></template></el-table-column>
-        </el-table>
-      </div>
+      <div v-if="artifactGroups.length" class="artifact-groups">
+        <section v-for="group in artifactGroups" :key="group.key" class="artifact-group" data-testid="artifact-group">
+          <header class="artifact-group-header">
+            <el-checkbox :model-value="groupSelected(group)" :indeterminate="groupIndeterminate(group)" :aria-label="`选择 ${group.title} 的全部产物`" @change="toggleGroupSelection(group, Boolean($event))" />
+            <button type="button" class="artifact-group-toggle" data-testid="artifact-group-toggle" :aria-expanded="isGroupExpanded(group)" @click="toggleGroup(group)">
+              <span class="group-icon"><Files /></span>
+              <span class="group-copy"><strong>{{ group.title }}</strong><small>{{ group.artifacts.length }} 个产物 · {{ formatBytes(group.totalSize) }} · {{ group.typeLabels.join('、') }}</small></span>
+              <span class="group-time">最近 {{ formatDate(group.latestCreatedAt) }}</span>
+              <el-icon><ArrowDown v-if="isGroupExpanded(group)" /><ArrowRight v-else /></el-icon>
+            </button>
+            <a v-if="group.sourceUrl" class="group-source" :href="group.sourceUrl" target="_blank" rel="noopener noreferrer"><el-icon><Link /></el-icon>官方源视频</a>
+          </header>
 
-      <div v-if="artifacts.length" class="mobile-artifacts">
-        <article v-for="artifact in artifacts" :key="artifact.id" data-testid="artifact-card">
-          <el-checkbox class="artifact-checkbox" :model-value="selectedIds.includes(artifact.id)" :aria-label="`选择 ${artifact.filename}`" @change="toggleArtifact(artifact, Boolean($event))" />
-          <div class="artifact-name"><span><el-icon><component :is="typeMap[artifact.type]?.icon || Files" /></el-icon></span><div><strong>{{ artifact.filename }}</strong><small>{{ artifact.retained ? (artifact.protected ? '用户受管保留' : '历史已清理 · 文件受管保留') : (artifact.videoTitle || '独立产物') }}</small><small v-if="analysisContext(artifact)" class="analysis-context">{{ analysisContext(artifact) }}</small></div></div>
-          <div class="artifact-meta"><span><el-tag size="small" effect="plain" type="info">{{ typeMap[artifact.type]?.label }}</el-tag></span><span v-if="artifact.retained"><el-tag size="small" effect="plain" type="warning">受管保留</el-tag></span><span v-else-if="artifact.jobStatus"><el-tag size="small" effect="plain" :type="jobStatusMap[artifact.jobStatus].type">{{ jobStatusMap[artifact.jobStatus].label }}</el-tag></span><span>{{ formatBytes(artifact.size) }}</span><span>{{ formatDate(artifact.createdAt) }}</span></div>
-          <div class="artifact-actions"><el-button :icon="View" @click="openDetails(artifact)">详情</el-button><el-button type="primary" plain :icon="Download" @click="downloadArtifact(artifact)">保存到设备</el-button><el-button type="danger" plain :icon="Delete" aria-label="删除产物" @click="removeArtifact(artifact)" /></div>
-        </article>
+          <div v-if="isGroupExpanded(group)" class="artifact-group-content">
+            <div class="desktop-artifacts">
+              <el-table :data="group.artifacts" row-key="id">
+                <el-table-column width="48"><template #default="{ row }"><el-checkbox :model-value="selectedIds.includes(row.id)" :aria-label="`选择 ${row.filename}`" @change="toggleArtifact(row, Boolean($event))" /></template></el-table-column>
+                <el-table-column label="产物" min-width="320"><template #default="{ row }"><div class="artifact-name"><span><el-icon><component :is="typeMap[row.type]?.icon || Files" /></el-icon></span><div><strong>{{ row.filename }}</strong><small>{{ row.retained ? (row.protected ? '用户受管保留' : '历史已清理 · 文件受管保留') : (row.partTitle || '整集产物') }}</small><small v-if="analysisContext(row)" class="analysis-context">{{ analysisContext(row) }}</small></div></div></template></el-table-column>
+                <el-table-column label="类型" width="110"><template #default="{ row }"><el-tag effect="plain" type="info">{{ typeMap[row.type]?.label || row.type }}</el-tag></template></el-table-column>
+                <el-table-column label="任务状态" width="125"><template #default="{ row }"><el-tag v-if="row.retained" effect="plain" type="warning">受管保留</el-tag><el-tag v-else-if="row.jobStatus" effect="plain" :type="jobStatusMap[row.jobStatus].type">{{ jobStatusMap[row.jobStatus].label }}</el-tag><span v-else>暂无</span></template></el-table-column>
+                <el-table-column label="文件信息" min-width="160"><template #default="{ row }">{{ formatBytes(row.size) }}<small class="cell-sub">{{ row.mediaInfo?.container || row.mimeType }}<template v-if="row.mediaInfo?.duration"> · {{ formatDuration(row.mediaInfo.duration) }}</template></small></template></el-table-column>
+                <el-table-column label="创建时间" min-width="150"><template #default="{ row }">{{ formatDate(row.createdAt) }}<small class="cell-sub">{{ row.expiresAt ? `清理于 ${formatDate(row.expiresAt)}` : '手动保留' }}</small></template></el-table-column>
+                <el-table-column label="操作" width="236" fixed="right"><template #default="{ row }"><el-button text :icon="View" @click="openDetails(row)">详情</el-button><el-button text type="primary" :icon="Download" @click="downloadArtifact(row)">保存</el-button><el-button text type="danger" :icon="Delete" aria-label="删除产物" @click="removeArtifact(row)" /></template></el-table-column>
+              </el-table>
+            </div>
+
+            <div class="mobile-artifacts">
+              <article v-for="artifact in group.artifacts" :key="artifact.id" data-testid="artifact-card">
+                <el-checkbox class="artifact-checkbox" :model-value="selectedIds.includes(artifact.id)" :aria-label="`选择 ${artifact.filename}`" @change="toggleArtifact(artifact, Boolean($event))" />
+                <div class="artifact-name"><span><el-icon><component :is="typeMap[artifact.type]?.icon || Files" /></el-icon></span><div><strong>{{ artifact.filename }}</strong><small>{{ artifact.retained ? (artifact.protected ? '用户受管保留' : '历史已清理 · 文件受管保留') : (artifact.partTitle || '整集产物') }}</small><small v-if="analysisContext(artifact)" class="analysis-context">{{ analysisContext(artifact) }}</small></div></div>
+                <div class="artifact-meta"><span><el-tag size="small" effect="plain" type="info">{{ typeMap[artifact.type]?.label }}</el-tag></span><span v-if="artifact.retained"><el-tag size="small" effect="plain" type="warning">受管保留</el-tag></span><span v-else-if="artifact.jobStatus"><el-tag size="small" effect="plain" :type="jobStatusMap[artifact.jobStatus].type">{{ jobStatusMap[artifact.jobStatus].label }}</el-tag></span><span>{{ formatBytes(artifact.size) }}</span><span>{{ formatDate(artifact.createdAt) }}</span></div>
+                <div class="artifact-actions"><el-button :icon="View" @click="openDetails(artifact)">详情</el-button><el-button type="primary" plain :icon="Download" @click="downloadArtifact(artifact)">保存到设备</el-button><el-button type="danger" plain :icon="Delete" aria-label="删除产物" @click="removeArtifact(artifact)" /></div>
+              </article>
+            </div>
+          </div>
+        </section>
       </div>
 
       <el-empty v-if="!loading && !artifacts.length" :image-size="110" description="没有符合条件的产物"><el-button type="primary" @click="$router.push('/')">解析并下载视频</el-button></el-empty>
@@ -325,12 +401,14 @@ onMounted(() => { void loadArtifacts(); void loadDisk() })
 .artifact-error { margin-bottom: 15px; }
 .batch-bar { display: flex; align-items: center; gap: 9px; margin-bottom: 11px; padding: 9px 12px; }.batch-bar > span { margin-right: auto; color: var(--text-tertiary); font-size: 11px; }
 .artifact-content { min-height: 320px; overflow: hidden; }.cell-sub { display: block; margin-top: 4px; color: var(--text-tertiary); font-size: 10px; }
+.artifact-groups { min-height: 0; }.artifact-group + .artifact-group { border-top: 1px solid var(--line-soft); }.artifact-group-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 68px; padding: 8px 14px; }.artifact-group-toggle { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 11px; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }.group-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 8px; background: var(--brand-soft); color: var(--brand); }.group-icon svg { width: 19px; }.group-copy { min-width: 0; }.group-copy strong, .group-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.group-copy strong { font-size: 13px; }.group-copy small, .group-time { margin-top: 4px; color: var(--text-tertiary); font-size: 10px; }.group-time { margin: 0; white-space: nowrap; }.group-source { display: inline-flex; align-items: center; gap: 5px; color: var(--brand); font-size: 11px; font-weight: 650; text-decoration: none; white-space: nowrap; }.artifact-group-content { border-top: 1px solid var(--line-soft); background: var(--surface-muted); }
+.artifact-group-toggle { min-height: 44px; }
 .artifact-name { display: flex; align-items: center; gap: 11px; min-width: 0; }.artifact-name > span { display: grid; place-items: center; flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); }.artifact-name strong, .artifact-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.artifact-name strong { max-width: 360px; }.artifact-name small { max-width: 360px; margin-top: 3px; color: var(--text-tertiary); font-size: 10px; }
 .desktop-artifacts :deep(.el-button + .el-button) { margin-left: 4px; }.mobile-artifacts { display: none; }.pagination { justify-content: flex-end; padding: 16px; border-top: 1px solid var(--line-soft); }
 .artifact-detail { min-height: 300px; }.artifact-detail h2 { margin: 20px 0; font-size: 19px; overflow-wrap: anywhere; }.media-preview, .image-preview { display: block; width: 100%; max-height: 360px; border-radius: 13px; background: #0d0f14; object-fit: contain; }.audio-preview { width: 100%; }.text-preview { max-height: 380px; margin: 0; padding: 14px; overflow: auto; border-radius: 12px; background: var(--surface-muted); color: var(--text-secondary); font: 12px/1.65 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }.file-preview { display: grid; place-items: center; gap: 10px; min-height: 180px; padding: 20px; border-radius: 13px; background: var(--surface-muted); color: var(--text-tertiary); text-align: center; }.file-preview .el-icon { font-size: 40px; }.artifact-detail dl { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }.artifact-detail dt { color: var(--text-tertiary); font-size: 10px; }.artifact-detail dd { margin: 5px 0 0; color: var(--text-secondary); overflow-wrap: anywhere; }.checksum { font-family: ui-monospace, monospace; font-size: 11px; }.detail-actions { display: flex; gap: 9px; margin-top: 24px; }
 @media (min-width: 1200px) {
   .artifact-content { display: flex; flex-direction: column; height: calc(100dvh - 292px); min-height: 320px; }
-  .desktop-artifacts { min-height: 0; overflow: auto; }
+  .artifact-groups { overflow: auto; }.desktop-artifacts { min-height: 0; overflow: auto; }
   .artifact-name strong, .artifact-name small { max-width: none; }
   .pagination { flex: 0 0 auto; }
 }
@@ -340,7 +418,7 @@ onMounted(() => { void loadArtifacts(); void loadDisk() })
   .batch-bar { position: sticky; top: 72px; z-index: 8; display: grid; grid-template-columns: 1fr 1fr; }.batch-bar strong, .batch-bar > span { grid-column: 1 / -1; }.batch-bar .el-button { margin: 0; min-height: 44px; }
   .disk-card { grid-template-columns: auto 1fr; }.disk-card a { grid-column: 2; }.disk-copy > div { display: grid; gap: 4px; }
   .filters { grid-template-columns: 1fr; }.filters :deep(.el-date-editor) { width: 100%; }
-  .desktop-artifacts { display: none; }.mobile-artifacts { display: grid; gap: 0; }.mobile-artifacts article { padding: 16px; border-bottom: 1px solid var(--line-soft); }.artifact-name strong, .artifact-name small { max-width: calc(100vw - 115px); }.artifact-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 13px; margin: 13px 0; color: var(--text-tertiary); font-size: 11px; }.artifact-actions { display: grid; grid-template-columns: auto 1fr auto; gap: 7px; }.artifact-actions .el-button { min-height: 44px; margin: 0; }
+  .artifact-group-header { grid-template-columns: auto minmax(0, 1fr); padding: 10px 12px; }.artifact-group-toggle { grid-template-columns: auto minmax(0, 1fr) auto; }.group-time { display: none; }.group-source { grid-column: 2; min-height: 32px; }.desktop-artifacts { display: none; }.mobile-artifacts { display: grid; gap: 0; }.mobile-artifacts article { padding: 16px; border-bottom: 1px solid var(--line-soft); background: var(--surface); }.artifact-name strong, .artifact-name small { max-width: calc(100vw - 115px); }.artifact-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 13px; margin: 13px 0; color: var(--text-tertiary); font-size: 11px; }.artifact-actions { display: grid; grid-template-columns: auto 1fr auto; gap: 7px; }.artifact-actions .el-button { min-height: 44px; margin: 0; }
   .pagination { justify-content: center; overflow-x: auto; }.artifact-detail dl { grid-template-columns: 1fr; }
 }
 </style>

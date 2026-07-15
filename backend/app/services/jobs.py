@@ -30,6 +30,8 @@ from app.schemas.jobs import (
     DownloadBatchRequest,
     DownloadCreatedResponse,
     DownloadRequest,
+    JobBatchDeleteResponse,
+    JobDeleteResponse,
     JobEvent,
     JobList,
     JobRead,
@@ -813,6 +815,89 @@ class JobService:
         if job is None:
             raise self._not_found()
         return self._model_to_read(job)
+
+    async def delete(self, job_id: str) -> JobDeleteResponse:
+        async with (
+            self._mutation_lock,
+            self.artifact_service.mutation_guard(),
+            self.session_factory() as session,
+        ):
+            job = await session.scalar(
+                select(Job).where(Job.id == job_id).options(selectinload(Job.artifacts))
+            )
+            if job is None:
+                raise self._not_found()
+            if (
+                job.status not in _TERMINAL_STATUSES
+                or job_id in self._active
+                or job_id in self._scheduled
+            ):
+                raise AppError(
+                    ErrorCode.VALIDATION_ERROR,
+                    "任务仍在执行或等待执行，不能直接删除",
+                    action="先取消任务，等待状态变为已取消后再删除",
+                    status_code=status.HTTP_409_CONFLICT,
+                )
+
+            artifact_ids = {artifact.id for artifact in job.artifacts}
+            if artifact_ids:
+                remaining_payloads = list(
+                    (await session.scalars(select(Job.input_json).where(Job.id != job_id))).all()
+                )
+                is_referenced = any(
+                    self._payload_artifact_ids(payload) & artifact_ids
+                    for payload in remaining_payloads
+                )
+                if is_referenced:
+                    raise AppError(
+                        ErrorCode.VALIDATION_ERROR,
+                        "该任务的产物仍被其他任务引用，暂时不能删除",
+                        action="等待关联任务结束并删除关联记录后重试",
+                        status_code=status.HTTP_409_CONFLICT,
+                    )
+
+            retention_stage = await self.artifact_service.retain_records_for_privacy_cleanup(
+                list(job.artifacts),
+                reason="user_retained",
+                protected=True,
+            )
+            try:
+                session.add_all(retention_stage.records)
+                await session.execute(
+                    delete(Analysis).where(Analysis.parameters["jobId"].as_string() == job_id)
+                )
+                await session.delete(job)
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                await self.artifact_service.rollback_retained_stage(retention_stage)
+                raise
+            await self.artifact_service.complete_retained_stage(retention_stage)
+
+        self._runtime.pop(job_id, None)
+        self._versions.pop(job_id, None)
+        self._event_kinds.pop(job_id, None)
+        self._inactive_events.pop(job_id, None)
+        self._controls.pop(job_id, None)
+        return JobDeleteResponse(
+            id=job_id,
+            deleted=True,
+            retained_artifact_count=len(retention_stage.records),
+        )
+
+    async def delete_many(self, job_ids: Sequence[str]) -> JobBatchDeleteResponse:
+        results: list[JobDeleteResponse] = []
+        failed_ids: list[str] = []
+        for job_id in job_ids:
+            try:
+                results.append(await self.delete(job_id))
+            except AppError:
+                failed_ids.append(job_id)
+        return JobBatchDeleteResponse(
+            results=results,
+            failed_ids=failed_ids,
+            deleted_count=len(results),
+        )
 
     async def cancel(self, job_id: str) -> JobRead:
         clean_now = False

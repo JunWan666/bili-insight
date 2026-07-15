@@ -53,6 +53,11 @@ export interface TestApiState {
   settingsUpdates: AppSettings[]
   artifactDeletions: ArtifactDeletionRecord[]
   artifactBatchDeletions: Array<{ artifactIds: string[]; deleteFile: boolean }>
+  jobDeletions: string[]
+  jobBatchDeletions: string[][]
+  videoDeletions: string[]
+  videoBatchDeletions: string[][]
+  deletedVideoIds: string[]
   cookieUploadCount: number
   cookieClearCount: number
   jobListRequestCount: number
@@ -670,6 +675,11 @@ function initialState(): TestApiState {
     settingsUpdates: [],
     artifactDeletions: [],
     artifactBatchDeletions: [],
+    jobDeletions: [],
+    jobBatchDeletions: [],
+    videoDeletions: [],
+    videoBatchDeletions: [],
+    deletedVideoIds: [],
     cookieUploadCount: 0,
     cookieClearCount: 0,
     jobListRequestCount: 0,
@@ -849,7 +859,7 @@ async function installApiRoutes(page: Page, state: TestApiState): Promise<void> 
     }
     if (method === 'GET' && path === '/videos') {
       const video = videoDetail(state)
-      await fulfillJson(route, [{
+      await fulfillJson(route, state.deletedVideoIds.includes(video.id) ? [] : [{
         id: video.id,
         bvid: video.bvid,
         title: video.title,
@@ -859,6 +869,25 @@ async function installApiRoutes(page: Page, state: TestApiState): Promise<void> 
         parsedAt: video.parsedAt,
         normalizedUrl: video.normalizedUrl,
       }])
+      return
+    }
+    if (method === 'POST' && path === '/videos/batch-delete') {
+      const body = jsonBody(request)
+      const videoIds = Array.isArray(body.videoIds) ? body.videoIds.filter((item): item is string => typeof item === 'string') : []
+      state.videoBatchDeletions.push(clone(videoIds))
+      const deletedIds = videoIds.filter((id) => id === 'video-e2e' && !state.deletedVideoIds.includes(id))
+      state.deletedVideoIds.push(...deletedIds)
+      await fulfillJson(route, {
+        results: deletedIds.map((id) => ({ id, deleted: true })),
+        failedIds: videoIds.filter((id) => !deletedIds.includes(id)),
+        deletedCount: deletedIds.length,
+      })
+      return
+    }
+    if (method === 'DELETE' && path === '/videos/video-e2e') {
+      state.videoDeletions.push('video-e2e')
+      state.deletedVideoIds.push('video-e2e')
+      await fulfillJson(route, { id: 'video-e2e', deleted: true })
       return
     }
     if (method === 'GET' && path === '/videos/video-e2e') {
@@ -893,6 +922,28 @@ async function installApiRoutes(page: Page, state: TestApiState): Promise<void> 
         && (!activeOnly || activeStatuses.has(job.status))
       ))
       await fulfillJson(route, { items: clone(filtered.slice(offset, offset + limit)), total: filtered.length, limit, offset })
+      return
+    }
+    if (method === 'POST' && path === '/jobs/batch-delete') {
+      const body = jsonBody(request)
+      const jobIds = Array.isArray(body.jobIds) ? body.jobIds.filter((item): item is string => typeof item === 'string') : []
+      state.jobBatchDeletions.push(clone(jobIds))
+      const terminal = new Set(['completed', 'failed', 'canceled'])
+      const deletedIds = jobIds.filter((id) => state.jobs.some((job) => job.id === id && terminal.has(job.status)))
+      state.jobs = state.jobs.filter((job) => !deletedIds.includes(job.id))
+      await fulfillJson(route, {
+        results: deletedIds.map((id) => ({ id, deleted: true, retainedArtifactCount: 0 })),
+        failedIds: jobIds.filter((id) => !deletedIds.includes(id)),
+        deletedCount: deletedIds.length,
+      })
+      return
+    }
+    const jobDeleteMatch = path.match(/^\/jobs\/([^/]+)$/)
+    if (method === 'DELETE' && jobDeleteMatch) {
+      const jobId = decodeURIComponent(jobDeleteMatch[1] ?? '')
+      state.jobDeletions.push(jobId)
+      state.jobs = state.jobs.filter((job) => job.id !== jobId)
+      await fulfillJson(route, { id: jobId, deleted: true, retainedArtifactCount: 0 })
       return
     }
     if (method === 'POST' && path === '/downloads') {

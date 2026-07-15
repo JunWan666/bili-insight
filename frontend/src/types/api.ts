@@ -658,6 +658,18 @@ export interface JobEvent {
   occurredAt: string
 }
 
+export interface JobDeleteResult {
+  id: string
+  deleted: boolean
+  retainedArtifactCount: number
+}
+
+export interface JobBatchDeleteResult {
+  results: JobDeleteResult[]
+  failedIds: string[]
+  deletedCount: number
+}
+
 export type ArtifactType =
   | 'video'
   | 'audio'
@@ -833,4 +845,15 @@ export interface RecentVideo {
   duration: number
   parsedAt: string
   normalizedUrl: string
+}
+
+export interface VideoDeleteResult {
+  id: string
+  deleted: boolean
+}
+
+export interface VideoBatchDeleteResult {
+  results: VideoDeleteResult[]
+  failedIds: string[]
+  deletedCount: number
 }

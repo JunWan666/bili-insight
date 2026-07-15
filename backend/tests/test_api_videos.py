@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.core.exceptions import AppError, ErrorCode
-from app.db.models import AccessContext, MediaStream, Video
+from app.db.models import AccessContext, Job, JobStatus, JobType, MediaStream, Video
 from app.providers.models import ProviderStreams
 from app.schemas.video import AccessMode
 from tests.conftest import UpstreamFixtureServer
@@ -341,6 +341,72 @@ async def test_video_endpoints_and_cache(
     )
     assert refreshed.status_code == 200
     assert refreshed.json()["cacheHit"] is False
+
+
+async def test_recent_videos_support_safe_individual_and_batch_deletion(
+    api_client: tuple[Any, Any],
+) -> None:
+    client, app = api_client
+    parsed = await client.post(
+        "/api/v1/videos/parse",
+        json={"url": "BV1FYT5zkE1q", "accessMode": "anonymous"},
+    )
+    assert parsed.status_code == 200
+    video_id = parsed.json()["video"]["id"]
+    stream_ids = {
+        item["id"] for kind in ("video", "audio") for item in parsed.json()["streams"][kind]
+    }
+
+    deleted = await client.delete(f"/api/v1/videos/{video_id}")
+    assert deleted.status_code == 200
+    assert deleted.json() == {"id": video_id, "deleted": True}
+    assert (await client.get(f"/api/v1/videos/{video_id}")).status_code == 404
+    assert stream_ids.isdisjoint(app.state.container.video_service._source_urls)
+
+    parsed_again = await client.post(
+        "/api/v1/videos/parse",
+        json={"url": "BV1FYT5zkE1q", "accessMode": "anonymous"},
+    )
+    linked_video_id = parsed_again.json()["video"]["id"]
+    clean_video = Video(
+        provider="bilibili",
+        bvid="BV1CleanDelete1",
+        aid=987654321,
+        title="可删除的最近解析",
+        description="",
+        cover_url="https://i0.hdslb.com/clean.jpg",
+        owner_name="测试用户",
+        duration=60,
+        stats={},
+        tags=[],
+        rights={},
+        raw_metadata={},
+    )
+    linked_job = Job(
+        type=JobType.DOWNLOAD,
+        status=JobStatus.COMPLETED,
+        phase="completed",
+        progress=100,
+        input_json={"video_id": linked_video_id},
+        retry_count=0,
+        cancel_requested=False,
+    )
+    async with app.state.container.session_factory() as session:
+        session.add_all([clean_video, linked_job])
+        await session.commit()
+        await session.refresh(clean_video)
+
+    blocked = await client.delete(f"/api/v1/videos/{linked_video_id}")
+    assert blocked.status_code == 409
+    assert "关联任务" in blocked.json()["error"]["message"]
+    batch = await client.post(
+        "/api/v1/videos/batch-delete",
+        json={"videoIds": [clean_video.id, linked_video_id, "missing-video"]},
+    )
+    assert batch.status_code == 200
+    assert batch.json()["deletedCount"] == 1
+    assert batch.json()["results"] == [{"id": clean_video.id, "deleted": True}]
+    assert batch.json()["failedIds"] == [linked_video_id, "missing-video"]
 
 
 async def test_authenticated_parse_requires_valid_credentials(api_client: tuple[Any, Any]) -> None:

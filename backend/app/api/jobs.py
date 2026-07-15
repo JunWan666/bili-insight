@@ -8,7 +8,13 @@ from fastapi.responses import StreamingResponse
 
 from app.api.dependencies import get_job_service
 from app.db.models import JobStatus, JobType
-from app.schemas.jobs import JobList, JobRead
+from app.schemas.jobs import (
+    JobBatchDeleteRequest,
+    JobBatchDeleteResponse,
+    JobDeleteResponse,
+    JobList,
+    JobRead,
+)
 from app.services.jobs import JobService
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -32,12 +38,28 @@ async def list_jobs(
     )
 
 
+@router.post("/batch-delete", response_model=JobBatchDeleteResponse)
+async def delete_jobs(
+    payload: JobBatchDeleteRequest,
+    service: JobService = Depends(get_job_service),
+) -> JobBatchDeleteResponse:
+    return await service.delete_many(payload.job_ids)
+
+
 @router.get("/{job_id}", response_model=JobRead)
 async def get_job(
     job_id: str,
     service: JobService = Depends(get_job_service),
 ) -> JobRead:
     return await service.get(job_id)
+
+
+@router.delete("/{job_id}", response_model=JobDeleteResponse)
+async def delete_job(
+    job_id: str,
+    service: JobService = Depends(get_job_service),
+) -> JobDeleteResponse:
+    return await service.delete(job_id)
 
 
 @router.get("/{job_id}/events")

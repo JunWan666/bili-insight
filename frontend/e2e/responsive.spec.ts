@@ -202,6 +202,9 @@ test('触控视口的关键操作目标至少为 44×44 px', async ({ page }, te
   await assertTouchTarget(page.getByRole('button', { name: '查看详情' }).first(), '任务详情')
 
   await page.goto('/artifacts')
+  const artifactGroupToggle = page.getByTestId('artifact-group-toggle').first()
+  await assertTouchTarget(artifactGroupToggle, '展开产物分组')
+  await artifactGroupToggle.tap()
   const saveArtifact = testInfo.project.use.viewport?.width && testInfo.project.use.viewport.width < 768
     ? page.getByRole('button', { name: '保存到设备' }).first()
     : page.locator('.desktop-artifacts').getByRole('button', { name: '保存' }).first()

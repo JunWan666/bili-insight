@@ -146,6 +146,29 @@ class JobList(CamelModel):
     offset: int = Field(ge=0)
 
 
+class JobDeleteResponse(CamelModel):
+    id: str
+    deleted: bool
+    retained_artifact_count: int = Field(ge=0)
+
+
+class JobBatchDeleteRequest(CamelModel):
+    job_ids: list[str] = Field(min_length=1, max_length=100)
+
+    @field_validator("job_ids")
+    @classmethod
+    def unique_jobs(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("job IDs must be unique")
+        return values
+
+
+class JobBatchDeleteResponse(CamelModel):
+    results: list[JobDeleteResponse]
+    failed_ids: list[str]
+    deleted_count: int = Field(ge=0)
+
+
 class JobEvent(CamelModel):
     event_id: str
     event: Literal["snapshot", "progress", "state"]

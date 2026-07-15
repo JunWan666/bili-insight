@@ -852,6 +852,112 @@ async def test_job_and_download_api_contract(
         assert retried.status_code == 200 and retried.json()["retryCount"] == 1
 
 
+async def test_terminal_jobs_can_be_deleted_individually_and_in_batches(
+    job_environment: tuple[JobService, ControlledExecutor, ControlledExecutor, object, object],
+) -> None:
+    service, download, _, factory, _ = job_environment
+    terminal_jobs = [
+        Job(
+            type=JobType.DOWNLOAD,
+            status=JobStatus.COMPLETED,
+            phase="completed",
+            progress=100,
+            input_json={**download.payload, "part_id": f"part-{index}"},
+            retry_count=0,
+            cancel_requested=False,
+            finished_at=datetime.now(UTC),
+        )
+        for index in range(2)
+    ]
+    active_job = Job(
+        type=JobType.DOWNLOAD,
+        status=JobStatus.PAUSED,
+        phase="paused",
+        progress=25,
+        input_json={**download.payload, "part_id": "active-part"},
+        retry_count=0,
+        cancel_requested=False,
+    )
+    async with factory() as session:  # type: ignore[operator]
+        session.add_all([*terminal_jobs, active_job])
+        await session.commit()
+        for job in [*terminal_jobs, active_job]:
+            await session.refresh(job)
+
+    artifact = await publish_job_artifact(service, terminal_jobs[0].id, "video")
+    deleted = await service.delete(terminal_jobs[0].id)
+    assert deleted.deleted is True
+    assert deleted.retained_artifact_count == 1
+    assert await service.artifact_service.get(artifact.id)
+    async with factory() as session:  # type: ignore[operator]
+        retained = await session.get(RetainedFile, artifact.id)
+        assert retained is not None
+        assert retained.protected is True
+        assert retained.retention_reason == "user_retained"
+
+    result = await service.delete_many([terminal_jobs[1].id, active_job.id, "missing-job"])
+    assert result.deleted_count == 1
+    assert [item.id for item in result.results] == [terminal_jobs[1].id]
+    assert result.failed_ids == [active_job.id, "missing-job"]
+    assert (await service.get(active_job.id)).status == JobStatus.PAUSED
+
+
+async def test_job_delete_api_rejects_active_and_preserves_completed_artifacts(
+    job_environment: tuple[JobService, ControlledExecutor, ControlledExecutor, object, object],
+) -> None:
+    service, download, _, factory, _ = job_environment
+    completed = Job(
+        type=JobType.DOWNLOAD,
+        status=JobStatus.COMPLETED,
+        phase="completed",
+        progress=100,
+        input_json=dict(download.payload),
+        retry_count=0,
+        cancel_requested=False,
+        finished_at=datetime.now(UTC),
+    )
+    queued = Job(
+        type=JobType.DOWNLOAD,
+        status=JobStatus.QUEUED,
+        phase="queued",
+        progress=0,
+        input_json={**download.payload, "part_id": "queued-part"},
+        retry_count=0,
+        cancel_requested=False,
+    )
+    async with factory() as session:  # type: ignore[operator]
+        session.add_all([completed, queued])
+        await session.commit()
+        await session.refresh(completed)
+        await session.refresh(queued)
+    artifact = await publish_job_artifact(service, completed.id, "audio")
+
+    app = FastAPI()
+    app.state.container = SimpleNamespace(job_service=service)
+    install_exception_handlers(app)
+    app.include_router(jobs_router, prefix="/api/v1")
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        blocked = await client.delete(f"/api/v1/jobs/{queued.id}")
+        assert blocked.status_code == 409
+        assert blocked.json()["error"]["action"].startswith("先取消任务")
+        deleted = await client.delete(f"/api/v1/jobs/{completed.id}")
+        assert deleted.status_code == 200
+        assert deleted.json() == {
+            "id": completed.id,
+            "deleted": True,
+            "retainedArtifactCount": 1,
+        }
+        batch = await client.post(
+            "/api/v1/jobs/batch-delete",
+            json={"jobIds": [queued.id, "missing-job"]},
+        )
+        assert batch.status_code == 200
+        assert batch.json()["failedIds"] == [queued.id, "missing-job"]
+    assert await service.artifact_service.get(artifact.id)
+
+
 async def test_maintenance_cleans_terminal_history_and_is_stoppable(
     job_environment: tuple[JobService, ControlledExecutor, ControlledExecutor, object, object],
 ) -> None:

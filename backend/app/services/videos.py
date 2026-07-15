@@ -15,6 +15,8 @@ from app.core.config import Settings
 from app.core.exceptions import AppError, ErrorCode
 from app.db.models import (
     AccessContext,
+    Analysis,
+    Job,
     MediaStream,
     StreamAccessRequirement,
     StreamKind,
@@ -37,6 +39,8 @@ from app.schemas.video import (
     RecentVideoRead,
     StreamsRead,
     StreamVerificationRead,
+    VideoBatchDeleteResponse,
+    VideoDeleteResponse,
     VideoPartRead,
     VideoRead,
     VideoStats,
@@ -162,6 +166,45 @@ class VideoService:
             )
             for video in videos
         ]
+
+    async def delete(self, video_id: str) -> VideoDeleteResponse:
+        async with self._lock, self.session_factory() as session:
+            video = await self._load_video(session, video_id)
+            if video is None:
+                raise self._not_found("视频记录不存在", "刷新最近解析列表后重试")
+            related_job = await session.scalar(
+                select(Job.id).where(Job.input_json["video_id"].as_string() == video_id).limit(1)
+            )
+            related_analysis = await session.scalar(
+                select(Analysis.id).where(Analysis.video_id == video_id).limit(1)
+            )
+            if related_job is not None or related_analysis is not None:
+                raise AppError(
+                    ErrorCode.VALIDATION_ERROR,
+                    "该视频仍有关联任务或分析记录，不能从最近解析中删除",
+                    action="先在任务中心删除相关任务，并清理关联分析后重试",
+                    status_code=409,
+                )
+            stream_ids = {stream.id for part in video.parts for stream in part.streams}
+            await session.delete(video)
+            await session.commit()
+            for stream_id in stream_ids:
+                self._source_urls.pop(stream_id, None)
+        return VideoDeleteResponse(id=video_id, deleted=True)
+
+    async def delete_many(self, video_ids: list[str]) -> VideoBatchDeleteResponse:
+        results: list[VideoDeleteResponse] = []
+        failed_ids: list[str] = []
+        for video_id in video_ids:
+            try:
+                results.append(await self.delete(video_id))
+            except AppError:
+                failed_ids.append(video_id)
+        return VideoBatchDeleteResponse(
+            results=results,
+            failed_ids=failed_ids,
+            deleted_count=len(results),
+        )
 
     async def get_parts(self, video_id: str) -> list[VideoPartRead]:
         async with self.session_factory() as session:
