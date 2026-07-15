@@ -8,14 +8,19 @@ import {
   Film,
   Monitor,
   Setting,
+  SwitchButton,
+  User,
 } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
 import AuthStatusBadge from '@/components/AuthStatusBadge.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useAppAuthStore } from '@/stores/appAuth'
 import { useJobsStore } from '@/stores/jobs'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const appAuth = useAppAuthStore()
 const jobs = useJobsStore()
 
 const navigation = [
@@ -45,16 +50,39 @@ function handlePageHide(): void {
   jobs.dispose()
 }
 
+async function logout(): Promise<void> {
+  try {
+    await ElMessageBox.confirm('退出后需要重新输入本机管理员密码。', '退出 Bili Insight', {
+      confirmButtonText: '退出',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  await appAuth.logout()
+  jobs.dispose()
+  await router.replace({ name: 'app-login' })
+}
+
+function handleSessionExpired(): void {
+  appAuth.expire()
+  jobs.dispose()
+  if (route.name !== 'app-login') void router.replace({ name: 'app-login', query: { returnTo: route.fullPath } })
+}
+
 onMounted(() => {
   void auth.load().catch(() => undefined)
   void jobs.refreshActive()
   document.addEventListener('visibilitychange', handleVisibility)
   window.addEventListener('pagehide', handlePageHide)
+  window.addEventListener('bili-insight:session-expired', handleSessionExpired)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', handleVisibility)
   window.removeEventListener('pagehide', handlePageHide)
+  window.removeEventListener('bili-insight:session-expired', handleSessionExpired)
   jobs.dispose()
 })
 </script>
@@ -83,6 +111,11 @@ onBeforeUnmount(() => {
       </nav>
 
       <div class="sidebar-spacer" />
+      <div class="admin-session">
+        <el-icon><User /></el-icon>
+        <span><small>本机管理员</small><strong>{{ appAuth.status?.username }}</strong></span>
+        <el-tooltip content="退出登录" placement="right"><button type="button" aria-label="退出登录" @click="logout"><SwitchButton /></button></el-tooltip>
+      </div>
       <button class="diagnostics-link" type="button" @click="navigate('/diagnostics')">
         <el-icon><Monitor /></el-icon><span>关于与诊断</span>
       </button>
@@ -154,6 +187,8 @@ onBeforeUnmount(() => {
 .desktop-nav .el-icon, .diagnostics-link .el-icon { font-size: 20px; }
 .nav-badge { margin-left: auto; min-width: 22px; padding: 2px 6px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 11px; text-align: center; }
 .sidebar-spacer { flex: 1; }
+.admin-session { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; margin-bottom: 9px; padding: 10px 11px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+.admin-session > .el-icon { color: var(--brand); }.admin-session span { min-width: 0; }.admin-session small, .admin-session strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.admin-session small { color: var(--text-tertiary); font-size: 9px; }.admin-session strong { margin-top: 2px; font-size: 11px; }.admin-session button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; }.admin-session button:hover { color: var(--danger); }
 .diagnostics-link { margin-bottom: 10px; }
 .auth-card { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line-soft); border-radius: 14px; color: inherit; text-decoration: none; }
 .auth-card small { color: var(--text-tertiary); line-height: 1.4; overflow-wrap: anywhere; }
@@ -171,7 +206,8 @@ onBeforeUnmount(() => {
 @media (min-width: 768px) and (max-width: 1199px) {
   .sidebar { width: 84px; padding-inline: 12px; }
   .brand { justify-content: center; padding-inline: 0; }
-  .brand-copy, .desktop-nav button > span, .diagnostics-link span, .auth-card small, .auth-card :deep(.auth-badge span) { display: none; }
+  .brand-copy, .desktop-nav button > span, .diagnostics-link span, .auth-card small, .auth-card :deep(.auth-badge span), .admin-session span { display: none; }
+  .admin-session { display: flex; justify-content: center; padding-inline: 0; }.admin-session > .el-icon { display: none; }
   .desktop-nav button, .diagnostics-link { justify-content: center; padding: 0; }
   .nav-badge { position: absolute; margin: -27px 0 0 27px; }
   .auth-card { place-items: center; padding: 10px 4px; }

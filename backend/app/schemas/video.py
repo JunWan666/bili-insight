@@ -75,6 +75,7 @@ class VideoRead(CamelModel):
     tags: list[str]
     rights: dict[str, bool | int | str | None]
     parsed_at: datetime
+    normalized_url: str
 
 
 class RecentVideoRead(CamelModel):
@@ -85,6 +86,7 @@ class RecentVideoRead(CamelModel):
     owner_name: str
     duration: int
     parsed_at: datetime
+    normalized_url: str
 
 
 class MediaStreamRead(CamelModel):

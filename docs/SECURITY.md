@@ -19,7 +19,7 @@ Docker 的加密主密钥位于 `bili-insight-secrets` 卷，数据库位于 `bi
 ## 网络安全
 
 - 默认网关只绑定 `127.0.0.1`，后端不发布主机端口。
-- `WEB_HOST=0.0.0.0` 只用于隔离、可信局域网中的临时移动端验收，并且只暴露 Nginx 网关。当前版本没有独立应用账号体系，不得在公共 Wi-Fi、访客网络、端口转发或公网 IP 上启用。
+- `WEB_HOST=0.0.0.0` 只用于隔离、可信局域网中的临时移动端验收，并且只暴露 Nginx 网关。当前版本使用唯一的本机管理员、HttpOnly 会话与 CSRF 校验保护业务接口，但没有公网级多用户隔离，不得在公共 Wi-Fi、访客网络、端口转发或公网 IP 上直接启用。
 - Bilibili 链接使用协议、域名和地址白名单校验，跳转目标需要逐跳重新校验。
 - Cookie 依照 CookieJar 域和 path 规则发送，并限制到明确允许的 Bilibili 服务域。
 - 媒体流只允许访问配置中的精确 CDN 后缀；番剧 PGC 额外仅放行
@@ -29,7 +29,15 @@ Docker 的加密主密钥位于 `bili-insight-secrets` 卷，数据库位于 `bi
 - 页面标题、简介、字幕、OCR、弹幕和分析文本均按不可信内容处理。
 - Nginx 设置 CSP、`frame-ancestors`、`nosniff`、Referrer Policy 与 Permissions Policy。
 
-公网或长期局域网代理要求见 [部署与运维说明](DEPLOYMENT.md)。没有 HTTPS 和应用鉴权时，非回环监听只能用于隔离可信网络中的短期验收。
+公网或长期局域网代理要求见 [部署与运维说明](DEPLOYMENT.md)。即使已有本机管理员登录，没有 HTTPS、入口限流和可信代理边界时，非回环监听仍只能用于隔离可信网络中的短期验收。
+
+## 应用管理员会话
+
+- 首次初始化只能创建一个本机管理员；密码仅保存 Argon2id 哈希，不保存明文或可逆密文。
+- 会话令牌只保存在 `HttpOnly`、`SameSite=Strict` Cookie 中，数据库只保存 SHA-256 摘要；退出、过期和密码轮换均可撤销会话。
+- 所有业务 API 都要求有效应用会话，`GET`/`HEAD`/`OPTIONS` 以外的方法还必须携带与会话绑定的 CSRF 令牌。
+- 本地 HTTP 默认允许非 Secure Cookie，以支持 `127.0.0.1` 与可信局域网验收；HTTPS 部署应设置 `APP_SESSION_COOKIE_SECURE=true`。
+- 应用登录与 Bilibili Cookie 登录相互独立。管理员密码不能替代 Bilibili Cookie，Bilibili Cookie 也不能绕过应用登录。
 
 ## 在线预览安全
 

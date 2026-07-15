@@ -164,7 +164,8 @@ onMounted(() => {
         <div><h2>最近解析</h2><p>继续查看此前解析的视频和分 P。</p></div>
       </div>
       <div class="recent-grid">
-        <RouterLink v-for="video in videos.recent" :key="video.id" class="recent-card surface-card" :to="`/videos/${video.id}`">
+        <article v-for="video in videos.recent" :key="video.id" class="recent-card surface-card">
+          <RouterLink :to="`/videos/${video.id}`" class="recent-main">
           <div class="recent-cover">
             <img :src="video.coverUrl" :alt="`${video.title} 封面`" loading="lazy" referrerpolicy="no-referrer" />
             <span>{{ formatDuration(video.duration) }}</span>
@@ -174,7 +175,9 @@ onMounted(() => {
             <p>{{ video.ownerName }}</p>
             <small><el-icon><Clock /></el-icon>{{ formatDate(video.parsedAt) }}</small>
           </div>
-        </RouterLink>
+          </RouterLink>
+          <a class="recent-source" :href="video.normalizedUrl" target="_blank" rel="noopener noreferrer">官方源视频</a>
+        </article>
       </div>
     </section>
 
@@ -235,6 +238,8 @@ onMounted(() => {
 .section-heading p { margin: 5px 0 0; color: var(--text-secondary); }
 .recent-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .recent-card { overflow: hidden; color: inherit; text-decoration: none; transition: transform .16s, box-shadow .16s; }
+.recent-main { display: block; color: inherit; text-decoration: none; }
+.recent-source { display: block; margin: -5px 14px 13px; color: var(--brand); font-size: 11px; font-weight: 650; text-decoration: none; }
 .recent-card:hover { transform: translateY(-2px); box-shadow: 0 11px 30px rgba(31, 36, 51, .1); }
 .recent-cover { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: var(--surface-muted); }
 .recent-cover img { width: 100%; height: 100%; object-fit: cover; }

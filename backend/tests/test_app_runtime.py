@@ -26,6 +26,31 @@ def _safe_runtime_error() -> AppError:
     )
 
 
+async def _setup_app_auth(client: httpx.AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/app-auth/setup",
+        json={
+            "username": "runtime-admin",
+            "password": "runtime-admin-password-2026",
+            "confirmPassword": "runtime-admin-password-2026",
+        },
+    )
+    assert response.status_code == 200, response.text
+    client.headers["X-CSRF-Token"] = response.json()["csrfToken"]
+
+
+async def _login_app_auth(client: httpx.AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/app-auth/login",
+        json={
+            "username": "runtime-admin",
+            "password": "runtime-admin-password-2026",
+        },
+    )
+    assert response.status_code == 200, response.text
+    client.headers["X-CSRF-Token"] = response.json()["csrfToken"]
+
+
 async def test_complete_application_routes_and_worker_lifecycle(
     settings: Settings,
     upstream: UpstreamFixtureServer,
@@ -39,6 +64,7 @@ async def test_complete_application_routes_and_worker_lifecycle(
         assert container.job_service._maintenance_task is not None
         transport = httpx.ASGITransport(app=application, raise_app_exceptions=False)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            await _setup_app_auth(client)
             requests = (
                 client.get("/api/v1/jobs"),
                 client.get("/api/v1/artifacts"),
@@ -344,6 +370,7 @@ async def test_persisted_runtime_storage_is_reapplied_after_restart(
     async with first.router.lifespan_context(first):
         transport = httpx.ASGITransport(app=first, raise_app_exceptions=False)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            await _setup_app_auth(client)
             payload = (await client.get("/api/v1/settings")).json()
             payload["download"]["concurrency"] = 4
             payload["storage"]["artifactDirectory"] = "persisted/artifacts"
@@ -398,6 +425,7 @@ async def test_persisted_runtime_storage_is_reapplied_after_restart(
         assert container.job_service.health().workers_by_lane == {"download": 4, "analysis": 1}
         transport = httpx.ASGITransport(app=second, raise_app_exceptions=False)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            await _login_app_auth(client)
             persisted = (await client.get("/api/v1/settings")).json()
             ready = await client.get("/api/v1/health/ready")
         assert persisted["storage"]["artifactDirectory"] == "persisted/artifacts"

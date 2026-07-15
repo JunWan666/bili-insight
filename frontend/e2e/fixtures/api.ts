@@ -6,6 +6,7 @@ import {
   type Route,
 } from '@playwright/test'
 import type {
+  AppAuthStatus,
   AppSettings,
   Artifact,
   AuthStatus,
@@ -35,6 +36,9 @@ interface ArtifactDeletionRecord {
 }
 
 export interface TestApiState {
+  appInitialized: boolean
+  appAuthenticated: boolean
+  appUsername: string
   authenticated: boolean
   premium: boolean
   remembered: boolean
@@ -48,6 +52,7 @@ export interface TestApiState {
   analysisEdits: Array<{ analysisId: string; body: Record<string, unknown> }>
   settingsUpdates: AppSettings[]
   artifactDeletions: ArtifactDeletionRecord[]
+  artifactBatchDeletions: Array<{ artifactIds: string[]; deleteFile: boolean }>
   cookieUploadCount: number
   cookieClearCount: number
   jobListRequestCount: number
@@ -62,6 +67,8 @@ export interface TestApiState {
 
 export interface TestApiController {
   state: TestApiState
+  setAppAuthenticated(value: boolean): void
+  setAppInitialized(value: boolean): void
   setAuthenticated(value: boolean): void
   setJobs(jobs: Job[]): void
 }
@@ -72,6 +79,16 @@ type Fixtures = {
 
 function clone<T>(value: T): T {
   return structuredClone(value)
+}
+
+function appAuthStatus(state: TestApiState): AppAuthStatus {
+  return {
+    initialized: state.appInitialized,
+    authenticated: state.appAuthenticated,
+    username: state.appAuthenticated ? state.appUsername : null,
+    csrfToken: state.appAuthenticated ? 'e2e-csrf-token' : null,
+    sessionExpiresAt: state.appAuthenticated ? '2026-07-15T20:00:00.000Z' : null,
+  }
 }
 
 function authStatus(state: TestApiState): AuthStatus {
@@ -272,6 +289,10 @@ function createJob(overrides: Partial<Job> = {}): Job {
     companionOutcomes: {},
     hasWarnings: false,
     ...overrides,
+    sourceUrl: overrides.sourceUrl === undefined
+      ? 'https://www.bilibili.com/video/BV1TEST/?p=2'
+      : overrides.sourceUrl,
+    reused: overrides.reused ?? false,
   }
 }
 
@@ -296,6 +317,7 @@ function artifact(): Artifact {
     videoTitle: 'E2E 测试专用：响应式视频解析样本',
     partId: 'part-2',
     partTitle: '第二部分：媒体选择与任务创建',
+    sourceUrl: 'https://www.bilibili.com/video/BV1TEST/?p=2',
     jobStatus: 'completed',
     type: 'video',
     filename: 'E2E-测试专用-第二部分.mp4',
@@ -631,6 +653,9 @@ function analysisFixtures(): Array<Record<string, unknown>> {
 
 function initialState(): TestApiState {
   return {
+    appInitialized: true,
+    appAuthenticated: true,
+    appUsername: 'e2e-admin',
     authenticated: false,
     premium: true,
     remembered: false,
@@ -644,6 +669,7 @@ function initialState(): TestApiState {
     analysisEdits: [],
     settingsUpdates: [],
     artifactDeletions: [],
+    artifactBatchDeletions: [],
     cookieUploadCount: 0,
     cookieClearCount: 0,
     jobListRequestCount: 0,
@@ -693,6 +719,35 @@ async function installApiRoutes(page: Page, state: TestApiState): Promise<void> 
     const url = new URL(request.url())
     const path = url.pathname.slice(apiPrefix.length)
     const method = request.method()
+
+    if (method === 'GET' && path === '/app-auth/status') {
+      await fulfillJson(route, appAuthStatus(state))
+      return
+    }
+    if (method === 'POST' && path === '/app-auth/setup') {
+      const body = jsonBody(request)
+      state.appInitialized = true
+      state.appAuthenticated = true
+      state.appUsername = typeof body.username === 'string' ? body.username : 'e2e-admin'
+      await fulfillJson(route, appAuthStatus(state))
+      return
+    }
+    if (method === 'POST' && path === '/app-auth/login') {
+      const body = jsonBody(request)
+      state.appAuthenticated = true
+      state.appUsername = typeof body.username === 'string' ? body.username : state.appUsername
+      await fulfillJson(route, appAuthStatus(state))
+      return
+    }
+    if (method === 'POST' && path === '/app-auth/logout') {
+      state.appAuthenticated = false
+      await fulfillJson(route, appAuthStatus(state))
+      return
+    }
+    if (method === 'PUT' && path === '/app-auth/password') {
+      await fulfillJson(route, appAuthStatus(state))
+      return
+    }
 
     if (method === 'GET' && /^\/jobs\/[^/]+\/events$/.test(path)) {
       const jobId = path.split('/')[2] ?? ''
@@ -802,6 +857,7 @@ async function installApiRoutes(page: Page, state: TestApiState): Promise<void> 
         ownerName: video.ownerName,
         duration: video.duration,
         parsedAt: video.parsedAt,
+        normalizedUrl: video.normalizedUrl,
       }])
       return
     }
@@ -1031,6 +1087,23 @@ async function installApiRoutes(page: Page, state: TestApiState): Promise<void> 
       return
     }
     const artifactMatch = path.match(/^\/artifacts\/([^/]+)$/)
+    if (method === 'POST' && path === '/artifacts/batch-delete') {
+      const body = jsonBody(request)
+      const artifactIds = Array.isArray(body.artifactIds)
+        ? body.artifactIds.filter((item): item is string => typeof item === 'string')
+        : []
+      const deleteFile = body.deleteFile !== false
+      state.artifactBatchDeletions.push({ artifactIds: clone(artifactIds), deleteFile })
+      const existing = new Set(state.artifacts.map((item) => item.id))
+      const deletedIds = artifactIds.filter((id) => existing.has(id))
+      state.artifacts = state.artifacts.filter((item) => !deletedIds.includes(item.id))
+      await fulfillJson(route, {
+        results: deletedIds.map((id) => ({ id, recordDeleted: true, fileDeleted: deleteFile, retained: false })),
+        failedIds: artifactIds.filter((id) => !existing.has(id)),
+        deletedCount: deletedIds.length,
+      })
+      return
+    }
     if (artifactMatch && method === 'GET') {
       const artifactId = decodeURIComponent(artifactMatch[1] ?? '')
       const item = state.artifacts.find((entry) => entry.id === artifactId)
@@ -1083,6 +1156,12 @@ export const test = base.extend<Fixtures>({
     await installApiRoutes(page, state)
     await use({
       state,
+      setAppAuthenticated(value: boolean): void {
+        state.appAuthenticated = value
+      },
+      setAppInitialized(value: boolean): void {
+        state.appInitialized = value
+      },
       setAuthenticated(value: boolean): void {
         state.authenticated = value
       },

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Check, CircleCheck, Lock, Select, VideoCamera, VideoPlay } from '@element-plus/icons-vue'
+import { Check, CircleCheck, Headset, Lock, Select, VideoCamera, VideoPlay } from '@element-plus/icons-vue'
 import type { DownloadPreset, MediaStream, StreamCollection } from '@/types/api'
 import { useMobile } from '@/composables/useMobile'
 import { formatBitrate, formatBytes } from '@/utils/format'
@@ -21,6 +21,7 @@ const emit = defineEmits<{
   'update:selectedVideoId': [value: string | null]
   'update:selectedAudioId': [value: string | null]
   configure: []
+  'audio-download': []
   preview: []
   verify: [streamIds: string[]]
 }>()
@@ -267,6 +268,13 @@ watch(
         <small v-if="audioPreviewFallback" class="preview-fallback">{{ audioPreviewFallback }}</small>
       </div>
       <div class="selection-actions">
+        <el-button
+          v-if="selectedAudio"
+          :icon="Headset"
+          @click="$emit('audio-download')"
+        >
+          下载音频
+        </el-button>
         <el-tooltip
           :disabled="isMobile"
           :content="previewTooltip"

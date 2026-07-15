@@ -96,6 +96,8 @@ class JobRead(CamelModel):
     video_title: str | None = None
     part_id: str | None = None
     part_title: str | None = None
+    source_url: str | None = None
+    reused: bool = False
     input: dict[str, object] = Field(default_factory=dict, exclude=True)
     error_code: str | None
     error_message: str | None

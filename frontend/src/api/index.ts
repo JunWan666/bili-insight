@@ -1,4 +1,4 @@
-import { http, unwrap } from './http'
+import { http, setCsrfToken, unwrap } from './http'
 import {
   normalizeAnalysis,
   normalizeAnalysisCapabilities,
@@ -23,8 +23,13 @@ import type {
   AnalysisFilters,
   AnalysisListResult,
   AnalysisRecord,
+  AppAuthStatus,
+  AppLoginRequest,
+  AppPasswordChangeRequest,
+  AppSetupRequest,
   AppSettings,
   Artifact,
+  ArtifactBatchDeleteResult,
   ArtifactDeleteResult,
   ArtifactFilters,
   AuthStatus,
@@ -47,6 +52,34 @@ import type {
   StorageStatus,
   VideoDetail,
 } from '@/types/api'
+
+export const appAuthApi = {
+  async status(): Promise<AppAuthStatus> {
+    const { data } = await http.get<AppAuthStatus>('/app-auth/status')
+    setCsrfToken(data.csrfToken)
+    return data
+  },
+  async setup(request: AppSetupRequest): Promise<AppAuthStatus> {
+    const { data } = await http.post<AppAuthStatus>('/app-auth/setup', request)
+    setCsrfToken(data.csrfToken)
+    return data
+  },
+  async login(request: AppLoginRequest): Promise<AppAuthStatus> {
+    const { data } = await http.post<AppAuthStatus>('/app-auth/login', request)
+    setCsrfToken(data.csrfToken)
+    return data
+  },
+  async logout(): Promise<AppAuthStatus> {
+    const { data } = await http.post<AppAuthStatus>('/app-auth/logout')
+    setCsrfToken(null)
+    return data
+  },
+  async changePassword(request: AppPasswordChangeRequest): Promise<AppAuthStatus> {
+    const { data } = await http.put<AppAuthStatus>('/app-auth/password', request)
+    setCsrfToken(data.csrfToken)
+    return data
+  },
+}
 
 export const videoApi = {
   async parse(url: string, accessMode: AccessMode, forceRefresh = false): Promise<ParsedVideoResult> {
@@ -247,6 +280,13 @@ export const artifactApi = {
       { params: { deleteFile } },
     )
     return unwrap(data)
+  },
+  async removeMany(artifactIds: string[], deleteFile = true): Promise<ArtifactBatchDeleteResult> {
+    const { data } = await http.post<ArtifactBatchDeleteResult>('/artifacts/batch-delete', {
+      artifactIds,
+      deleteFile,
+    })
+    return data
   },
 }
 

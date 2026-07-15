@@ -218,6 +218,40 @@ async def test_api_range_filters_storage_and_delete(
         }
 
 
+async def test_batch_delete_reports_successes_and_missing_artifacts(
+    artifact_environment: tuple[ArtifactService, object, object],
+) -> None:
+    service, factory, _ = artifact_environment
+    job = await create_job(factory)
+    first = await publish_bytes(service, job, filename="batch-first.mp4")
+    second = await publish_bytes(service, job, filename="batch-second.mp4")
+    missing_id = str(uuid.uuid4())
+    app = FastAPI()
+    app.state.container = SimpleNamespace(artifact_service=service)
+    install_exception_handlers(app)
+    app.include_router(artifacts_router, prefix="/api/v1")
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.post(
+            "/api/v1/artifacts/batch-delete",
+            json={
+                "artifactIds": [first.id, missing_id, second.id],
+                "deleteFile": True,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["deletedCount"] == 2
+    assert response.json()["failedIds"] == [missing_id]
+    assert {item["id"] for item in response.json()["results"]} == {first.id, second.id}
+    assert not (service.root / first.storage_key).exists()
+    assert not (service.root / second.storage_key).exists()
+    assert (await service.list(limit=10, offset=0)).total == 0
+
+
 async def test_record_only_delete_moves_file_to_retained_namespace(
     artifact_environment: tuple[ArtifactService, object, object],
 ) -> None:

@@ -314,6 +314,7 @@ class DownloadExecutor:
                 "bvid": part.video.bvid,
                 "page_number": part.page_number,
                 "quality_label": quality,
+                "official_source": self.video_service.official_url(part.video, part),
             }
         self.preflight_disk(expected_size)
         self.processor.check_available()

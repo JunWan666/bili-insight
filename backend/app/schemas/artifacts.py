@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.db.models import JobStatus
 from app.schemas.base import CamelModel
@@ -15,6 +15,7 @@ class ArtifactRead(CamelModel):
     video_title: str | None
     part_id: str | None
     part_title: str | None
+    source_url: str | None = None
     job_status: JobStatus | None = None
     type: str
     filename: str
@@ -43,6 +44,24 @@ class ArtifactDeleteResponse(CamelModel):
     record_deleted: bool
     file_deleted: bool
     retained: bool = False
+
+
+class ArtifactBatchDeleteRequest(CamelModel):
+    artifact_ids: list[str] = Field(min_length=1, max_length=100)
+    delete_file: bool = True
+
+    @field_validator("artifact_ids")
+    @classmethod
+    def unique_artifacts(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("artifact IDs must be unique")
+        return values
+
+
+class ArtifactBatchDeleteResponse(CamelModel):
+    results: list[ArtifactDeleteResponse]
+    failed_ids: list[str]
+    deleted_count: int = Field(ge=0)
 
 
 class StorageStatus(CamelModel):

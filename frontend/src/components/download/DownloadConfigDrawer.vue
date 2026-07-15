@@ -98,7 +98,7 @@ watch(() => props.modelValue, (open) => {
     : props.preset === 'best_compatibility'
       ? 'mp4'
       : (props.defaultContainer ?? 'mp4')
-  form.processingMode = props.preset === 'best_compatibility'
+  form.processingMode = !audioOnly.value && props.preset === 'best_compatibility'
     && !isBestCompatibilitySource(props.videoStream, props.audioStream)
     ? 'transcode'
     : 'copy'

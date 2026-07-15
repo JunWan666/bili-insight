@@ -474,6 +474,45 @@ async def test_duplicate_download_is_reused_before_workers_start(
     assert first.job.id == second.job.id
 
 
+async def test_duplicate_analysis_is_reused_only_when_effective_parameters_match(
+    job_environment: tuple[JobService, ControlledExecutor, ControlledExecutor, object, object],
+) -> None:
+    service, _, _, _, _ = job_environment
+    payload: dict[str, object] = {
+        "video_id": "video-analysis",
+        "video_title": "分析复用样例",
+        "part_ids": ["part-analysis"],
+        "features": ["basic", "media"],
+        "source_artifact_ids": {},
+        "language": "zh-CN",
+        "access_mode": "anonymous",
+        "asr_model": "small",
+        "device": "auto",
+        "ocr_resolution": "balanced",
+        "sample_interval_seconds": 2.0,
+        "export_formats": ["json"],
+        "maximum_duration_seconds": 3600,
+        "scene_threshold": 0.3,
+        "maximum_keyframes": 24,
+        "official_source": "https://www.bilibili.com/video/BV1Analysis/",
+    }
+
+    first = await service.create_analysis(payload, reuse_existing=True)
+    duplicate = await service.create_analysis(dict(payload), reuse_existing=True)
+    changed = await service.create_analysis(
+        {**payload, "features": ["basic", "media", "audio"]},
+        reuse_existing=True,
+    )
+    forced = await service.create_analysis(dict(payload), reuse_existing=False)
+
+    assert first.reused is False
+    assert duplicate.reused is True
+    assert duplicate.id == first.id
+    assert duplicate.source_url == "https://www.bilibili.com/video/BV1Analysis/"
+    assert changed.id != first.id
+    assert forced.id not in {first.id, changed.id}
+
+
 async def test_concurrent_single_download_creation_is_deduplicated_atomically(
     job_environment: tuple[JobService, ControlledExecutor, ControlledExecutor, object, object],
 ) -> None:
@@ -1041,10 +1080,8 @@ async def test_history_retention_removes_private_records_and_managed_files_only(
     assert managed_read.media_info is None
     delivery = await service.artifact_service.delivery(managed_artifact.id, None)
     assert delivery.path == managed_retained_path
-    assert (
-        await service.artifact_service.cleanup_older_than(older_than=current + timedelta(days=1))
-        == 1
-    )
+    cleanup_cutoff = datetime.now(UTC) + timedelta(days=1)
+    assert await service.artifact_service.cleanup_older_than(older_than=cleanup_cutoff) == 1
     assert not managed_retained_path.exists()
     assert explicit_retained_path.exists()
 

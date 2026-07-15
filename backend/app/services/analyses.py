@@ -746,7 +746,7 @@ class AnalysisService:
         self.engine_factory = engine_factory or _default_engine_factory
 
     async def create(self, request: AnalysisRequest) -> JobRead:
-        video_title, part_titles = await self._validate_video_parts(
+        video_title, part_titles, official_source = await self._validate_video_parts(
             request.video_id, request.part_ids
         )
         features = tuple(
@@ -801,8 +801,12 @@ class AnalysisService:
             "maximum_duration_seconds": engine_options.maximum_duration_seconds,
             "scene_threshold": request.scene_threshold,
             "maximum_keyframes": request.maximum_keyframes,
+            "official_source": official_source,
         }
-        return await self.job_service.create(JobType.ANALYSIS, payload)
+        return await self.job_service.create_analysis(
+            payload,
+            reuse_existing=request.reuse_existing,
+        )
 
     async def capabilities(self) -> AnalysisCapabilities:
         options, ocr_enabled = await self._configured_engine_options()
@@ -1926,7 +1930,7 @@ class AnalysisService:
 
     async def _validate_video_parts(
         self, video_id: str, part_ids: Sequence[str]
-    ) -> tuple[str, dict[str, str]]:
+    ) -> tuple[str, dict[str, str], str]:
         async with self.session_factory() as session:
             parts = list(
                 (
@@ -1948,7 +1952,11 @@ class AnalysisService:
                 action="返回视频详情页重新选择分 P",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
-        return parts[0].video.title, {part_id: found[part_id] for part_id in part_ids}
+        return (
+            parts[0].video.title,
+            {part_id: found[part_id] for part_id in part_ids},
+            VideoService.official_url(parts[0].video, parts[0]),
+        )
 
     async def _verified_source_artifact(
         self,

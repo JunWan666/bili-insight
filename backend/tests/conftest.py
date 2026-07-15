@@ -164,6 +164,16 @@ async def api_client(
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            setup = await client.post(
+                "/api/v1/app-auth/setup",
+                json={
+                    "username": "test-admin",
+                    "password": "test-admin-password-2026",
+                    "confirmPassword": "test-admin-password-2026",
+                },
+            )
+            assert setup.status_code == 200, setup.text
+            client.headers["X-CSRF-Token"] = setup.json()["csrfToken"]
             yield client, app
 
 

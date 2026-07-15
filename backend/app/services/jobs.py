@@ -734,6 +734,29 @@ class JobService:
         await self._publish(job.id, "state")
         return await self.get(job.id)
 
+    async def create_analysis(
+        self,
+        payload: dict[str, object],
+        *,
+        reuse_existing: bool,
+    ) -> JobRead:
+        self._validate_persisted_payload(payload)
+        async with self._mutation_lock:
+            if reuse_existing:
+                duplicate = await self._find_duplicate_analysis(payload)
+                if duplicate is not None:
+                    result = await self._to_read(duplicate)
+                    return result.model_copy(update={"reused": True})
+            record = self._new_job_record(JobType.ANALYSIS, payload)
+            async with self.session_factory() as session:
+                session.add(record)
+                await session.commit()
+                await session.refresh(record)
+                session.expunge(record)
+        self._enqueue(record.id, record.type)
+        await self._publish(record.id, "state")
+        return await self.get(record.id)
+
     async def list(
         self,
         *,
@@ -1196,6 +1219,33 @@ class JobService:
                 return job
         return None
 
+    async def _find_duplicate_analysis(self, payload: dict[str, object]) -> Job | None:
+        statuses = {
+            JobStatus.QUEUED,
+            JobStatus.PREPARING,
+            JobStatus.RUNNING,
+            JobStatus.POST_PROCESSING,
+            JobStatus.PAUSED,
+            JobStatus.COMPLETED,
+        }
+        async with self.session_factory() as session:
+            jobs = list(
+                (
+                    await session.scalars(
+                        select(Job)
+                        .where(Job.type == JobType.ANALYSIS, Job.status.in_(statuses))
+                        .options(selectinload(Job.artifacts))
+                        .order_by(Job.created_at.desc())
+                        .limit(200)
+                    )
+                ).all()
+            )
+            for job in jobs:
+                if self._same_analysis(cast(dict[str, object], job.input_json), payload):
+                    session.expunge(job)
+                    return job
+        return None
+
     async def _completed_download_satisfies(self, job: Job, payload: Mapping[str, object]) -> bool:
         artifacts = await self.artifact_service.existing_all_for_job(job.id)
         artifact_types = {item.type for item in artifacts}
@@ -1317,6 +1367,7 @@ class JobService:
             video_title=self._display_value(payload.get("video_title")),
             part_id=self._display_value(payload.get("part_id")),
             part_title=self._display_value(payload.get("part_title")),
+            source_url=self._display_value(payload.get("official_source")),
             error_code=job.error_code,
             error_message=job.error_message,
             retry_count=job.retry_count,
@@ -1383,7 +1434,9 @@ class JobService:
         kind: str,
         job: JobRead,
     ) -> JobEvent:
-        event_kind = "progress" if kind == "progress" else "state"
+        event_kind: Literal["snapshot", "progress", "state"] = (
+            "progress" if kind == "progress" else "state"
+        )
         if kind == "snapshot":
             event_kind = "snapshot"
         return JobEvent(
@@ -1432,6 +1485,26 @@ class JobService:
             "include_cover",
             "include_metadata",
             "include_danmaku",
+        )
+        return all(left.get(key) == right.get(key) for key in keys)
+
+    @staticmethod
+    def _same_analysis(left: dict[str, object], right: dict[str, object]) -> bool:
+        keys = (
+            "video_id",
+            "part_ids",
+            "features",
+            "source_artifact_ids",
+            "language",
+            "access_mode",
+            "asr_model",
+            "device",
+            "ocr_resolution",
+            "sample_interval_seconds",
+            "export_formats",
+            "maximum_duration_seconds",
+            "scene_threshold",
+            "maximum_keyframes",
         )
         return all(left.get(key) == right.get(key) for key in keys)
 

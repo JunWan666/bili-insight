@@ -1,5 +1,30 @@
 export type AccessMode = 'auto' | 'anonymous' | 'authenticated'
 
+export interface AppAuthStatus {
+  initialized: boolean
+  authenticated: boolean
+  username: string | null
+  csrfToken: string | null
+  sessionExpiresAt: string | null
+}
+
+export interface AppSetupRequest {
+  username: string
+  password: string
+  confirmPassword: string
+}
+
+export interface AppLoginRequest {
+  username: string
+  password: string
+}
+
+export interface AppPasswordChangeRequest {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
+}
+
 export type AuthState =
   | 'anonymous'
   | 'validating'
@@ -195,6 +220,7 @@ export interface CreateAnalysisRequest {
   accessMode: Exclude<AccessMode, 'auto'>
   asrModel: string
   ocrResolution: 'economy' | 'balanced' | 'detail'
+  reuseExisting?: boolean
 }
 
 export interface TranscriptEditSegmentRequest {
@@ -602,6 +628,8 @@ export interface Job {
   videoId: string | null
   videoTitle: string | null
   partTitle: string | null
+  sourceUrl: string | null
+  reused: boolean
   speedBytesPerSecond: number | null
   etaSeconds: number | null
   errorCode: string | null
@@ -668,6 +696,7 @@ export interface Artifact {
   videoTitle: string | null
   partId: string | null
   partTitle: string | null
+  sourceUrl: string | null
   jobStatus: JobStatus | null
   type: ArtifactType
   filename: string
@@ -688,6 +717,12 @@ export interface ArtifactDeleteResult {
   recordDeleted: boolean
   fileDeleted: boolean
   retained: boolean
+}
+
+export interface ArtifactBatchDeleteResult {
+  results: ArtifactDeleteResult[]
+  failedIds: string[]
+  deletedCount: number
 }
 
 export interface PageResult<T> {
@@ -797,4 +832,5 @@ export interface RecentVideo {
   ownerName: string
   duration: number
   parsedAt: string
+  normalizedUrl: string
 }

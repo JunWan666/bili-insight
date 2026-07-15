@@ -24,6 +24,7 @@ from app.services.analyses import (
     DownloadAnalysisMediaAcquirer,
     ProviderSubtitleService,
 )
+from app.services.app_auth import AppAuthService
 from app.services.artifacts import ArtifactService
 from app.services.auth import AuthService
 from app.services.diagnostics import DiagnosticsService
@@ -53,6 +54,7 @@ def create_app(
         media_resolver=media_resolver,
     )
     auth_service = AuthService(resolved_settings, session_factory, resolved_provider)
+    app_auth_service = AppAuthService(resolved_settings, session_factory)
     video_service = VideoService(
         resolved_settings, session_factory, resolved_provider, auth_service
     )
@@ -128,6 +130,7 @@ def create_app(
         session_factory=session_factory,
         provider=resolved_provider,
         auth_service=auth_service,
+        app_auth_service=app_auth_service,
         video_service=video_service,
         preview_service=preview_service,
         settings_service=settings_service,
@@ -146,6 +149,7 @@ def create_app(
         try:
             if resolved_settings.auto_create_schema:
                 await create_schema(engine)
+            await app_auth_service.initialize()
             await auth_service.initialize()
             persisted_settings = await settings_service.get()
             await diagnostics_service.apply_runtime_settings(persisted_settings)
@@ -186,7 +190,7 @@ def create_app(
             allow_origins=resolved_settings.cors_origin_list,
             allow_credentials=False,
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-            allow_headers=["Content-Type", "X-Request-ID", "X-API-Key"],
+            allow_headers=["Content-Type", "X-Request-ID", "X-API-Key", "X-CSRF-Token"],
             expose_headers=["X-Request-ID", "Content-Range", "Accept-Ranges"],
         )
     application.include_router(api_router)

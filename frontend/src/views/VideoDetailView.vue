@@ -50,6 +50,7 @@ const downloadOpen = ref(false)
 const batchDownloadOpen = ref(false)
 const analysisOpen = ref(false)
 const previewOpen = ref(false)
+const downloadAudioOnly = ref(false)
 const refreshingIdentity = ref(false)
 const verifyingStreams = ref(false)
 const descriptionExpanded = ref(false)
@@ -134,11 +135,16 @@ async function changeAccess(mode: 'anonymous' | 'authenticated'): Promise<void> 
   }
 }
 
-function openDownload(): void {
+function openDownload(audioOnly = false): void {
   if (!selectedPart.value || (!selectedVideoStream.value && !selectedAudioStream.value)) {
     ElMessage.warning('请先选择需要下载的媒体流')
     return
   }
+  if (audioOnly && !selectedAudioStream.value) {
+    ElMessage.warning('请先选择一个音频流')
+    return
+  }
+  downloadAudioOnly.value = audioOnly
   downloadOpen.value = true
 }
 
@@ -234,6 +240,7 @@ onMounted(() => void initialize())
         <div class="video-copy">
           <div class="identity-line"><el-tag effect="plain">{{ video.bvid }}</el-tag><el-tag v-if="video.rights.copyright" type="info" effect="plain">{{ video.rights.copyright }}</el-tag><el-tag v-if="video.rights.isPaid" type="danger" effect="plain">付费内容</el-tag><el-tag v-if="video.rights.isPremiumOnly" type="warning" effect="plain">会员内容</el-tag><span>{{ video.fromCache ? '缓存数据' : '实时解析' }} · {{ formatDate(video.parsedAt) }}</span></div>
           <h1>{{ video.title }}</h1>
+          <a class="official-link" :href="video.normalizedUrl" target="_blank" rel="noopener noreferrer">打开官方源视频</a>
           <div class="meta-row"><span><el-icon><User /></el-icon>{{ video.ownerName }}</span><span><el-icon><Calendar /></el-icon>{{ formatDate(video.publishedAt) }}</span><span><el-icon><CollectionTag /></el-icon>{{ video.parts.length }} 个分 P</span></div>
           <div class="stat-row"><span><el-icon><View /></el-icon>{{ formatNumber(video.statistics.views) }} 播放</span><span><el-icon><Star /></el-icon>{{ formatNumber(video.statistics.favorites) }} 收藏</span><span><el-icon><Document /></el-icon>{{ formatNumber(video.statistics.danmaku) }} 弹幕</span></div>
           <div v-if="video.tags.length" class="tags"><el-tag v-for="tag in video.tags" :key="tag" size="small" type="info" effect="plain">{{ tag }}</el-tag></div>
@@ -282,6 +289,7 @@ onMounted(() => void initialize())
             :minimum-resolution-height="minimumResolutionHeight"
             :verifying="verifyingStreams"
             @configure="openDownload"
+            @audio-download="openDownload(true)"
             @preview="openPreview"
             @verify="verifySelectedStreams"
           />
@@ -332,7 +340,7 @@ onMounted(() => void initialize())
         v-model="downloadOpen"
         :video="video"
         :part="selectedPart"
-        :videoStream="selectedVideoStream"
+        :videoStream="downloadAudioOnly ? null : selectedVideoStream"
         :audioStream="selectedAudioStream"
         :preset="preset"
         :accessMode="actualAccessMode"
@@ -375,6 +383,7 @@ onMounted(() => void initialize())
 .cover-wrap img { width: 100%; height: 100%; object-fit: cover; }
 .cover-wrap > span { position: absolute; right: 10px; bottom: 10px; display: flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 7px; background: rgba(18, 20, 25, .8); color: white; font-size: 12px; }
 .video-copy { min-width: 0; }
+.official-link { display: inline-flex; margin: -4px 0 9px; color: var(--brand); font-size: 12px; font-weight: 650; text-decoration: none; }
 .identity-line { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; color: var(--text-tertiary); font-size: 11px; }
 .video-copy h1 { margin: 10px 0 11px; font-size: 27px; line-height: 1.28; letter-spacing: 0; overflow-wrap: anywhere; }
 .meta-row, .stat-row { display: flex; flex-wrap: wrap; gap: 14px 20px; color: var(--text-secondary); font-size: 12px; }

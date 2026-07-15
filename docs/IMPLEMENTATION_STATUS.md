@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-当前版本达到本地单用户/可信环境的 Production Ready 标准。本轮番剧 `ss/ep` 解析、匿名/登录/大会员 PGC 规格、所选清晰度在线播放、桌面全宽一屏布局和移动端适配均已完成；完整 Playwright 七项目矩阵、`0005_stream_preview_metadata` Docker 迁移、真实 Cookie 4K Shaka 播放、Range 代理和安全审计均已复验通过。
+当前版本达到本地单用户/可信环境的 Production Ready 标准。本轮新增本机管理员登录、应用会话与 CSRF 保护、分析/下载任务复用、按视频任务分组、产物详情与批量管理、官方源链接和独立音频下载；完整 Playwright 矩阵、`0006_application_auth` Docker 迁移、真实 Cookie 4K Shaka 播放、Range 代理和安全审计均已复验通过。
 
 ## 当前阶段
 
@@ -66,12 +66,12 @@
 
 | 门禁 | 当前结果 |
 | --- | --- |
-| 后端 Pytest | 483 passed，应用分支覆盖率 86.79%，高于 85% 门槛 |
+| 后端 Pytest | 488 passed，应用覆盖率 90%，高于 85% 门槛 |
 | 后端静态检查 | Ruff check、Ruff format check、mypy strict 全部通过 |
-| 前端单元测试 | 19 个文件、94 项 Vitest 全部通过 |
+| 前端单元测试 | 19 个文件、104 项 Vitest 全部通过 |
 | 前端静态与构建 | ESLint、Vue/TypeScript typecheck、Vite production build 全部通过 |
-| 完整 Playwright 矩阵 | 147 项：132 passed、15 项按设备能力预期 skipped；Chromium 手机/平板/桌面、WebKit 手机/桌面和 Firefox 桌面 0 failed |
-| Docker 与迁移 | 标准 Compose 重建已完成后端和预览功能验收；最终布局静态产物因 Docker Hub IPv6 临时不可达，使用同一已验证 Nginx 运行镜像离线替换并启动；两个容器 healthy，Alembic 为 `0005_stream_preview_metadata (head)` |
+| 完整 Playwright 矩阵 | 175 项：160 passed、15 项按设备能力预期 skipped；Chromium 手机/平板/桌面、WebKit 手机/桌面和 Firefox 桌面 0 failed |
+| Docker 与迁移 | 标准 Compose 重建已完成后端和预览功能验收；最终布局静态产物因 Docker Hub IPv6 临时不可达，使用同一已验证 Nginx 运行镜像离线替换并启动；两个容器 healthy，Alembic 为 `0006_application_auth (head)` |
 | 真实番剧播放 | `ss28747` 年度大会员解析得到 19 路视频、3 路音频；4K H.264 + AAC 在 Chromium 中实际播放、暂停和拖动通过 |
 | 依赖与仓库安全 | Python 两组 `pip-audit` 无已知漏洞；npm 官方 registry 审计 0 vulnerabilities；仓库凭据扫描通过 |
 | Compose 配置 | `docker compose --env-file .env.example config --quiet` 通过 |
@@ -127,7 +127,7 @@
 - 后端运行用户为 `uid=10001(app)`，前端运行用户为 `uid=101(nginx)`。
 - 两个容器均 `cap_drop: ALL` 且启用 `no-new-privileges`；前端根文件系统只读。
 - Cookie 加密密钥由独立命名卷生成，权限为 `0600 app:app`。
-- Alembic 实际运行版本为 `0005_stream_preview_metadata (head)`。
+- Alembic 实际运行版本为 `0006_application_auth (head)`。
 - 运行卷探针在后端重启后仍存在，验证 SQLite/产物卷持久性；探针随后已删除。
 - `/healthz` 与 `/api/v1/health/ready` 均返回 ready；数据库、Worker、FFmpeg 和 FFprobe 正常，存储探针同时验证目录可写性与最低磁盘余量。
 - Nginx CSP、COOP、Permissions Policy、Referrer Policy、nosniff 和 frame deny 响应头生效。
@@ -141,6 +141,7 @@
 | `0003_stream_access_requirement` | 为媒体流增加 NONE/LOGIN/PREMIUM/SPECIAL 权益要求并回填旧数据 |
 | `0004_retained_files` | 增加隐私历史清理后仍受管的保留文件表、索引和安全降级保护 |
 | `0005_stream_preview_metadata` | 为 `media_streams` 增加 `mime_type`、`codec_string`、初始化 Range 与索引 Range 元数据，用于生成不含上游 URL 的 SegmentBase MPD |
+| `0006_application_auth` | 增加本机管理员、Argon2id 密码哈希、可撤销应用会话和 CSRF 校验字段 |
 
 ## 本轮运行页面验收
 

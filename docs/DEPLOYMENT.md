@@ -20,13 +20,13 @@ curl --fail http://127.0.0.1:8080/healthz
 
 1. 后端入口创建运行目录。
 2. 独立密钥卷没有有效密钥时，生成权限为仅应用用户可读的 Fernet 密钥。
-3. Alembic 将数据库迁移到当前版本；本轮 schema head 为 `0005_stream_preview_metadata`。
+3. Alembic 将数据库迁移到当前版本；本轮 schema head 为 `0006_application_auth`。
 4. Uvicorn 启动，Compose 持续检查 `/api/v1/health/ready`。
 5. 后端就绪后，Nginx 网关启动并发布本机端口。
 
 若迁移、目录权限、磁盘空间或 FFmpeg 检查失败，后端不会被判定为就绪，网关也不会提前接收业务流量。
 
-首次升级到 `0005_stream_preview_metadata` 时，`media_streams` 会增加 `mime_type`、`codec_string`、初始化 Range 起止和索引 Range 起止字段。迁移不保存上游签名 URL；已有流记录缺少这些字段时不会被错误用于在线播放，重新解析对应视频后会写入当前预览元数据。
+首次升级到 `0005_stream_preview_metadata` 时，`media_streams` 会增加 `mime_type`、`codec_string`、初始化 Range 起止和索引 Range 起止字段；升级到 `0006_application_auth` 时会增加本机管理员、可撤销会话和 CSRF 校验所需的表。迁移不保存上游签名 URL；已有流记录缺少这些字段时不会被错误用于在线播放，重新解析对应视频后会写入当前预览元数据。
 
 ## 更新与回滚
 
@@ -93,7 +93,7 @@ docker compose exec backend ffprobe -version
 docker compose up --detach --force-recreate frontend
 ```
 
-同一网络中的设备可访问 `http://<主机局域网IP>:${WEB_PORT}`。该模式只发布 Nginx 网关，不发布 FastAPI 端口；但局域网中任何能访问该端口的设备都可以使用当前单用户应用，因此不得在公共 Wi-Fi、访客网络、端口转发或公网 IP 上使用。验收结束后应把 `WEB_HOST` 改回 `127.0.0.1`。
+同一网络中的设备可访问 `http://<主机局域网IP>:${WEB_PORT}`。该模式只发布 Nginx 网关，不发布 FastAPI 端口；未登录设备只能进入管理员登录页，业务 API 受会话与 CSRF 保护。由于 HTTP 仍不提供传输加密，管理员密码和会话可能被同网段攻击者窃听，因此不得在公共 Wi-Fi、访客网络、端口转发或公网 IP 上使用。验收结束后应把 `WEB_HOST` 改回 `127.0.0.1`。
 
 长期局域网或公网部署应在本机网关之前增加受信任的 HTTPS 反向代理，并同时满足：
 

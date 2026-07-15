@@ -6,6 +6,7 @@ from fastapi import Request
 
 from app.container import ApplicationContainer
 from app.services.analyses import AnalysisService
+from app.services.app_auth import AppAuthService
 from app.services.artifacts import ArtifactService
 from app.services.auth import AuthService
 from app.services.diagnostics import DiagnosticsService
@@ -21,6 +22,10 @@ def get_container(request: Request) -> ApplicationContainer:
 
 def get_auth_service(request: Request) -> AuthService:
     return get_container(request).auth_service
+
+
+def get_app_auth_service(request: Request) -> AppAuthService:
+    return get_container(request).app_auth_service
 
 
 def get_video_service(request: Request) -> VideoService:

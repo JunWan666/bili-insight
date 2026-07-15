@@ -308,6 +308,7 @@ async def test_video_endpoints_and_cache(
             "ownerName": "样例UP主",
             "duration": 218,
             "parsedAt": recent.json()[0]["parsedAt"],
+            "normalizedUrl": "https://www.bilibili.com/video/BV1FYT5zkE1q/",
         }
     ]
     parts = await client.get(f"/api/v1/videos/{video_id}/parts")

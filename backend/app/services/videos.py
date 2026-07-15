@@ -158,6 +158,7 @@ class VideoService:
                 owner_name=video.owner_name,
                 duration=video.duration,
                 parsed_at=self._as_utc(video.parsed_at),
+                normalized_url=self._part_url(video, video.parts[0]),
             )
             for video in videos
         ]
@@ -725,6 +726,10 @@ class VideoService:
         return f"https://www.bilibili.com/video/{video.bvid}/{suffix}"
 
     @classmethod
+    def official_url(cls, video: Video, part: VideoPart) -> str:
+        return cls._part_url(video, part)
+
+    @classmethod
     def _episode_cid(cls, video: Video, episode_id: int) -> int | None:
         episode = cls._episode_metadata(video, episode_id=episode_id)
         cid = episode.get("cid") if episode is not None else None
@@ -846,6 +851,7 @@ class VideoService:
             tags=video.tags,
             rights=video.rights,
             parsed_at=cls._as_utc(video.parsed_at),
+            normalized_url=cls._part_url(video, video.parts[0]),
         )
 
     @staticmethod

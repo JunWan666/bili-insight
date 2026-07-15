@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -15,6 +15,7 @@ import {
   Refresh,
   Setting,
   UploadFilled,
+  User,
   Warning,
 } from '@element-plus/icons-vue'
 import { settingsApi } from '@/api'
@@ -23,16 +24,18 @@ import AuthStatusBadge from '@/components/AuthStatusBadge.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import RequestError from '@/components/RequestError.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useAppAuthStore } from '@/stores/appAuth'
 import { useVideosStore } from '@/stores/videos'
 import type { AppSettings } from '@/types/api'
 import { formatBytes, formatDate } from '@/utils/format'
 import { safeVideoReturnPath } from '@/utils/safeReturnPath'
 
-type Section = 'auth' | 'download' | 'storage' | 'analysis' | 'network' | 'privacy'
+type Section = 'account' | 'auth' | 'download' | 'storage' | 'analysis' | 'network' | 'privacy'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const appAuth = useAppAuthStore()
 const videos = useVideosStore()
 const activeSection = ref<Section>('auth')
 const settings = ref<AppSettings | null>(null)
@@ -45,8 +48,11 @@ const rememberCookie = ref(false)
 const dragActive = ref(false)
 const uploadError = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
+const passwordForm = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' })
+const passwordChanging = ref(false)
 
 const sections: Array<{ value: Section; label: string; description: string; icon: typeof Key }> = [
+  { value: 'account', label: '管理员', description: '应用账号与密码', icon: User },
   { value: 'auth', label: '登录态', description: 'Cookie 上传与校验', icon: Key },
   { value: 'download', label: '下载', description: '预设、并发与命名', icon: Download },
   { value: 'storage', label: '存储', description: '目录、配额与清理', icon: Files },
@@ -68,6 +74,29 @@ const rateLimitMbps = computed({
 function setSection(section: Section): void {
   activeSection.value = section
   void router.replace({ query: section === 'auth' ? {} : { section } })
+}
+
+async function changePassword(): Promise<void> {
+  if (passwordForm.newPassword.length < 12) {
+    ElMessage.warning('新密码长度至少为 12 个字符')
+    return
+  }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    ElMessage.warning('两次输入的新密码不一致')
+    return
+  }
+  passwordChanging.value = true
+  try {
+    await appAuth.changePassword(passwordForm)
+    passwordForm.currentPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.confirmPassword = ''
+    ElMessage.success('管理员密码已更新，其他会话已经失效')
+  } catch (reason) {
+    ElMessage.error(toApiError(reason).message)
+  } finally {
+    passwordChanging.value = false
+  }
 }
 
 async function loadSettings(): Promise<void> {
@@ -176,7 +205,17 @@ onMounted(() => { void auth.load(); void loadSettings() })
       </nav>
 
       <main class="settings-panel surface-card">
-        <section v-if="activeSection === 'auth'" class="settings-section auth-section">
+        <section v-if="activeSection === 'account'" class="settings-section">
+          <div class="section-head"><div><h2>本机管理员</h2><p>该账号用于保护 Bili Insight 页面、任务、产物和 Cookie 设置，与 Bilibili 登录态相互独立。</p></div><el-tag type="success" effect="plain">{{ appAuth.status?.username }}</el-tag></div>
+          <div class="form-grid account-password-form">
+            <label class="wide"><span>当前密码</span><el-input v-model="passwordForm.currentPassword" type="password" show-password autocomplete="current-password" /></label>
+            <label><span>新密码</span><el-input v-model="passwordForm.newPassword" type="password" show-password autocomplete="new-password" /></label>
+            <label><span>确认新密码</span><el-input v-model="passwordForm.confirmPassword" type="password" show-password autocomplete="new-password" /></label>
+          </div>
+          <div class="account-actions"><el-button type="primary" :icon="Lock" :loading="passwordChanging" @click="changePassword">更新管理员密码</el-button></div>
+        </section>
+
+        <section v-else-if="activeSection === 'auth'" class="settings-section auth-section">
           <div class="section-head"><div><h2>Cookie 登录态</h2><p>上传常见浏览器扩展导出的 Cookie JSON。系统不会索取账号密码，也不会在浏览器内保存或回显 Cookie 原文。</p></div><AuthStatusBadge :status="auth.status" :loading="auth.loading" /></div>
 
           <div v-if="auth.status?.isAuthenticated" class="account-card">
@@ -281,7 +320,7 @@ onMounted(() => { void auth.load(); void loadSettings() })
 .auth-warning, .privacy-alert { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 14px; padding: 13px; border-radius: 12px; }.auth-warning { background: #fff2e8; color: #99521d; }.privacy-alert { background: var(--brand-soft); color: var(--brand); }.auth-warning p, .privacy-alert p { margin: 4px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
 .upload-area { display: grid; place-items: center; min-height: 210px; padding: 25px; border: 1.5px dashed var(--line); border-radius: 15px; background: var(--surface-muted); text-align: center; transition: .16s; }.upload-area.dragging { border-color: var(--brand); background: var(--brand-soft); }.upload-area.selected { border-style: solid; }.upload-area > .el-icon { margin-bottom: 10px; color: var(--brand); font-size: 42px; }.upload-area strong { overflow-wrap: anywhere; }.upload-area p { margin: 7px 0 14px; color: var(--text-tertiary); font-size: 11px; }.upload-error { margin: 9px 0 0; color: var(--danger); }
 .auth-workspace { display: grid; gap: 14px; }.remember-row, .switch-field { display: flex; align-items: center; justify-content: space-between; gap: 22px; }.remember-row { padding: 13px; border: 1px solid var(--line-soft); border-radius: 12px; }.remember-row strong, .remember-row small, .switch-field strong, .switch-field small { display: block; }.remember-row strong, .switch-field strong { font-size: 12px; }.remember-row small, .switch-field small { margin-top: 4px; color: var(--text-tertiary); font-size: 10px; line-height: 1.5; }.auth-actions { display: flex; flex-wrap: wrap; gap: 8px; }.auth-actions .el-button { margin-left: 0; }
-.settings-loading { padding: 30px; }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }.form-grid > label { display: grid; align-content: start; gap: 7px; min-width: 0; }.form-grid > label > span { color: var(--text-secondary); font-size: 11px; font-weight: 650; }.form-grid > label > small { color: var(--text-tertiary); font-size: 10px; }.form-grid .wide { grid-column: 1 / -1; }.form-grid :deep(.el-input-number) { width: 100%; }.form-grid .switch-field { display: flex; min-height: 60px; padding: 11px; border: 1px solid var(--line-soft); border-radius: 11px; }
+.settings-loading { padding: 30px; }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }.form-grid > label { display: grid; align-content: start; gap: 7px; min-width: 0; }.form-grid > label > span { color: var(--text-secondary); font-size: 11px; font-weight: 650; }.form-grid > label > small { color: var(--text-tertiary); font-size: 10px; }.form-grid .wide { grid-column: 1 / -1; }.form-grid :deep(.el-input-number) { width: 100%; }.form-grid .switch-field { display: flex; min-height: 60px; padding: 11px; border: 1px solid var(--line-soft); border-radius: 11px; }.account-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
 .save-error { margin: 0 28px 15px; }.save-bar { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 14px 28px; border-top: 1px solid var(--line-soft); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(14px); }.save-bar span { margin-right: auto; color: var(--text-tertiary); font-size: 11px; }
 @media (min-width: 1200px) {
   .auth-workspace { grid-template-columns: minmax(250px, .8fr) minmax(350px, 1.2fr); grid-template-rows: auto auto 1fr; column-gap: 18px; }

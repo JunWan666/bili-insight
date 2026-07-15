@@ -235,6 +235,7 @@ class FakeProvider:
 class FakeVideoService:
     _provider_video = staticmethod(VideoService._provider_video)
     _provider_part = staticmethod(VideoService._provider_part)
+    official_url = staticmethod(VideoService.official_url)
 
     def __init__(self) -> None:
         self.provider = FakeProvider()

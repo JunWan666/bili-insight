@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Bili Insight API"
-    version: str = "1.0.0"
+    version: str = "1.1.0"
     environment: Literal["development", "test", "production"] = "development"
     host: str = "127.0.0.1"
     port: int = Field(default=8000, ge=1, le=65535)
@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     cookie_encryption_key_file: Path | None = None
     cookie_upload_max_bytes: int = Field(default=1_048_576, ge=1_024, le=10_485_760)
     cookie_max_items: int = Field(default=300, ge=1, le=2_000)
+    app_session_ttl_seconds: int = Field(default=604_800, ge=1_800, le=2_592_000)
+    app_session_cookie_secure: bool = False
 
     metadata_cache_ttl_seconds: int = Field(default=1_200, ge=60, le=86_400)
     stream_cache_ttl_seconds: int = Field(default=300, ge=30, le=3_600)

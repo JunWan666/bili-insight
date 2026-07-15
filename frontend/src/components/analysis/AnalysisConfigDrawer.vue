@@ -108,7 +108,11 @@ async function submit(): Promise<void> {
   }
   try {
     const job = await jobs.createAnalysis(request)
-    ElNotification.success({ title: '分析任务已创建', message: '每项能力独立执行，单项失败不会移除已完成结果。' })
+    if (job.reused) {
+      ElNotification.info({ title: '已复用现有分析', message: '相同视频、分 P 与分析参数的任务已经存在。' })
+    } else {
+      ElNotification.success({ title: '分析任务已创建', message: '每项能力独立执行，单项失败不会移除已完成结果。' })
+    }
     emit('created', job.id)
     emit('update:modelValue', false)
   } catch (reason) {

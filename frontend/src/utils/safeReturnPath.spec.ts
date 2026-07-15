@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { safeVideoReturnPath } from './safeReturnPath'
+import { safeReturnPath, safeVideoReturnPath } from './safeReturnPath'
+
+describe('safeReturnPath', () => {
+  it.each(['/', '/jobs', '/artifacts?page=2', '/settings?section=account', '/diagnostics'])(
+    'allows a known local application route %s',
+    (value) => expect(safeReturnPath(value)).toBe(value),
+  )
+
+  it.each(['https://evil.example/jobs', '//evil.example/jobs', '/\\evil.example', '/unknown', '/jobs%0A'])(
+    'falls back to the home page for an unsafe route %s',
+    (value) => expect(safeReturnPath(value)).toBe('/'),
+  )
+})
 
 describe('safeVideoReturnPath', () => {
   it('allows only local video detail routes and preserves their query', () => {

@@ -11,6 +11,7 @@ from app.services.analyses import (
     DownloadAnalysisMediaAcquirer,
     ProviderSubtitleService,
 )
+from app.services.app_auth import AppAuthService
 from app.services.artifacts import ArtifactService
 from app.services.auth import AuthService
 from app.services.diagnostics import DiagnosticsService
@@ -29,6 +30,7 @@ class ApplicationContainer:
     session_factory: async_sessionmaker[AsyncSession]
     provider: VideoProvider
     auth_service: AuthService
+    app_auth_service: AppAuthService
     video_service: VideoService
     preview_service: PreviewService
     settings_service: SettingsService

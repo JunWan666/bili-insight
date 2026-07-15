@@ -78,6 +78,7 @@ class AnalysisRequest(CamelModel):
     maximum_duration_seconds: int | None = Field(default=3_600, ge=60, le=86_400)
     scene_threshold: float = Field(default=0.3, ge=0.01, le=0.99)
     maximum_keyframes: int = Field(default=24, ge=1, le=200)
+    reuse_existing: bool = True
 
     @field_validator("part_ids")
     @classmethod

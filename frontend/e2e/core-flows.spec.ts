@@ -155,6 +155,23 @@ test('视频流可明确选择不附加音频并提交 audioStreamId none', asyn
   })
 })
 
+test('可从媒体选择区直接创建纯音频下载任务', async ({ page, testApi }) => {
+  await page.goto('/videos/video-e2e')
+  await activate(page.getByRole('button', { name: '下载音频' }), page)
+  const drawer = page.getByTestId('download-config-drawer')
+  await expect(drawer).toBeVisible()
+  await expect(drawer.getByRole('button', { name: /M4A/ })).toHaveClass(/active/)
+  await activate(drawer.getByTestId('create-download-job'), page)
+
+  await expect.poll(() => testApi.state.downloadRequests.length).toBe(1)
+  expect(testApi.state.downloadRequests[0]).toMatchObject({
+    videoStreamId: null,
+    audioStreamId: 'audio-aac-192',
+    container: 'm4a',
+    processingMode: 'copy',
+  })
+})
+
 test('详情页上传 Cookie 后安全返回并自动执行一次登录态重解析', async ({ page }) => {
   await page.goto('/videos/video-e2e')
   await activate(page.getByTestId('supplement-auth-quality'), page)
@@ -310,6 +327,10 @@ test('任务中心在页面刷新后从 API 恢复进行中任务', async ({ pag
   await expect(card).toHaveCount(1)
   await expect(card).toContainText('下载视频流')
   await expect(card).toContainText('42%')
+  await expect(page.getByRole('link', { name: '官方源视频' }).first()).toHaveAttribute(
+    'href',
+    'https://www.bilibili.com/video/BV1TEST/?p=2',
+  )
   const firstLoadRequestCount = testApi.state.jobListRequestCount
   expect(firstLoadRequestCount).toBeGreaterThan(0)
 
@@ -449,6 +470,25 @@ test('产物删除前明确二次确认记录与文件范围', async ({ page, te
     { artifactId: 'artifact-e2e', deleteFile: true },
   ])
   await expect(page.getByText('E2E-测试专用-第二部分.mp4')).toHaveCount(0)
+})
+
+test('产物中心支持批量选择并彻底删除文件', async ({ page, testApi }) => {
+  await page.goto('/artifacts')
+  const viewport = page.viewportSize()
+  const selection = viewport && viewport.width < 768
+    ? page.locator('.mobile-artifacts .artifact-checkbox').first()
+    : page.locator('.desktop-artifacts .el-table__body-wrapper .el-checkbox').first()
+  await activate(selection, page)
+  const batchBar = page.locator('.batch-bar')
+  await expect(batchBar).toContainText('已选择 1 个产物')
+  await activate(batchBar.getByRole('button', { name: '批量删除' }), page)
+  await page.locator('.el-message-box').getByRole('button', { name: '全部彻底删除' }).click()
+
+  await expect.poll(() => testApi.state.artifactBatchDeletions).toEqual([{
+    artifactIds: ['artifact-e2e'],
+    deleteFile: true,
+  }])
+  await expect(page.getByTestId('artifact-card')).toHaveCount(0)
 })
 
 test('设置分组可修改保存并进入诊断页导出脱敏报告', async ({ page, testApi }) => {

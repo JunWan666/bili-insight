@@ -9,6 +9,8 @@ from fastapi.responses import StreamingResponse
 from app.api.dependencies import get_artifact_service
 from app.db.models import JobStatus
 from app.schemas.artifacts import (
+    ArtifactBatchDeleteRequest,
+    ArtifactBatchDeleteResponse,
     ArtifactDeleteResponse,
     ArtifactList,
     ArtifactRead,
@@ -48,6 +50,17 @@ async def storage_status(
     service: ArtifactService = Depends(get_artifact_service),
 ) -> StorageStatus:
     return await service.storage_status()
+
+
+@router.post("/batch-delete", response_model=ArtifactBatchDeleteResponse)
+async def delete_artifact_batch(
+    payload: ArtifactBatchDeleteRequest,
+    service: ArtifactService = Depends(get_artifact_service),
+) -> ArtifactBatchDeleteResponse:
+    return await service.delete_many(
+        payload.artifact_ids,
+        delete_file=payload.delete_file,
+    )
 
 
 @router.get("/{artifact_id}", response_model=ArtifactRead)

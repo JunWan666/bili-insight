@@ -1,6 +1,14 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { pinia } from '@/stores'
+import { useAppAuthStore } from '@/stores/appAuth'
 
 const routes: RouteRecordRaw[] = [
+  {
+    path: '/login',
+    name: 'app-login',
+    component: () => import('@/views/AppLoginView.vue'),
+    meta: { title: '管理员登录', public: true },
+  },
   {
     path: '/',
     name: 'home',
@@ -49,6 +57,26 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior: () => ({ top: 0 }),
+})
+
+router.beforeEach(async (route) => {
+  const auth = useAppAuthStore(pinia)
+  try {
+    await auth.load()
+  } catch {
+    if (route.name === 'app-login') return true
+    return { name: 'app-login' }
+  }
+  if (route.name === 'app-login') {
+    return auth.authenticated ? { name: 'home' } : true
+  }
+  if (!auth.authenticated) {
+    return {
+      name: 'app-login',
+      query: route.fullPath === '/' ? undefined : { returnTo: route.fullPath },
+    }
+  }
+  return true
 })
 
 router.afterEach((route) => {

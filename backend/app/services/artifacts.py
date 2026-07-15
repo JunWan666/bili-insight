@@ -26,6 +26,7 @@ from app.db.models import Artifact, Job, JobStatus, RetainedFile
 from app.media.download import iter_file
 from app.media.security import safe_child_path, sanitize_filename
 from app.schemas.artifacts import (
+    ArtifactBatchDeleteResponse,
     ArtifactDeleteResponse,
     ArtifactList,
     ArtifactRead,
@@ -516,6 +517,25 @@ class ArtifactService:
         async with self.mutation_guard():
             return await self._delete_unlocked(artifact_id, delete_file=delete_file)
 
+    async def delete_many(
+        self,
+        artifact_ids: Sequence[str],
+        *,
+        delete_file: bool,
+    ) -> ArtifactBatchDeleteResponse:
+        results: list[ArtifactDeleteResponse] = []
+        failed_ids: list[str] = []
+        for artifact_id in artifact_ids:
+            try:
+                results.append(await self.delete(artifact_id, delete_file=delete_file))
+            except AppError:
+                failed_ids.append(artifact_id)
+        return ArtifactBatchDeleteResponse(
+            results=results,
+            failed_ids=failed_ids,
+            deleted_count=sum(item.record_deleted for item in results),
+        )
+
     async def _delete_unlocked(
         self, artifact_id: str, *, delete_file: bool
     ) -> ArtifactDeleteResponse:
@@ -906,6 +926,7 @@ class ArtifactService:
             video_title=self._optional_display_value(payload.get("video_title")),
             part_id=self._optional_display_value(payload.get("part_id")),
             part_title=self._optional_display_value(payload.get("part_title")),
+            source_url=self._optional_display_value(payload.get("official_source")),
             job_status=job_status,
             type=record.type,
             filename=record.filename,
@@ -926,6 +947,7 @@ class ArtifactService:
             video_title=None,
             part_id=None,
             part_title=None,
+            source_url=None,
             job_status=None,
             type=record.type,
             filename=record.filename,

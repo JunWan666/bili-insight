@@ -11,6 +11,7 @@ import {
   Files,
   InfoFilled,
   MagicStick,
+  Link,
   MoreFilled,
   Refresh,
   RefreshLeft,
@@ -40,6 +41,25 @@ const summary = computed(() => ({
   paused: jobs.activeJobs.filter((job) => job.status === 'paused').length,
   failed: jobs.items.filter((job) => ['failed', 'canceled'].includes(job.status)).length,
 }))
+const groupedJobs = computed(() => {
+  const groups = new Map<string, { key: string; title: string; sourceUrl: string | null; jobs: Job[] }>()
+  for (const job of jobs.items) {
+    const key = job.videoId || `standalone-${job.id}`
+    const existing = groups.get(key)
+    if (existing) {
+      existing.jobs.push(job)
+      if (!existing.sourceUrl && job.sourceUrl) existing.sourceUrl = job.sourceUrl
+    } else {
+      groups.set(key, {
+        key,
+        title: job.videoTitle || typeView[job.type]?.label || '后台任务',
+        sourceUrl: job.sourceUrl,
+        jobs: [job],
+      })
+    }
+  }
+  return [...groups.values()]
+})
 
 const statusOptions: Array<{ value: typeof statusFilter.value; label: string }> = [
   { value: 'all', label: '全部状态' },
@@ -190,7 +210,12 @@ onMounted(() => void refreshAll())
     <RequestError v-if="jobs.error" class="jobs-error" :error="jobs.error" @retry="loadJobs()" />
 
     <section v-loading="jobs.loading && !jobs.items.length" class="job-list">
-      <article v-for="job in jobs.items" :key="job.id" class="job-card surface-card" data-testid="job-card">
+      <section v-for="group in groupedJobs" :key="group.key" class="job-group">
+        <header class="job-group-heading">
+          <div><strong>{{ group.title }}</strong><span>{{ group.jobs.length }} 个相关任务</span></div>
+          <a v-if="group.sourceUrl" :href="group.sourceUrl" target="_blank" rel="noopener noreferrer"><el-icon><Link /></el-icon>官方源视频</a>
+        </header>
+      <article v-for="job in group.jobs" :key="job.id" class="job-card surface-card" data-testid="job-card">
         <div class="job-top">
           <span class="type-icon"><el-icon><component :is="typeView[job.type]?.icon || MoreFilled" /></el-icon></span>
           <div class="job-title"><span><el-tag size="small" effect="plain" :type="statusView[job.status].type"><el-icon><component :is="statusView[job.status].icon" /></el-icon>{{ statusView[job.status].label }}</el-tag><small>{{ typeView[job.type]?.label || job.type }}</small></span><h2>{{ job.videoTitle || typeView[job.type]?.label || '后台任务' }}</h2><p>{{ job.partTitle || '任务级操作' }}</p></div>
@@ -214,6 +239,7 @@ onMounted(() => void refreshAll())
         <div class="job-actions">
           <el-button text :icon="MoreFilled" @click="toggleDetails(job.id)">{{ expanded.includes(job.id) ? '收起详情' : '查看详情' }}</el-button>
           <div>
+            <el-button v-if="job.sourceUrl" tag="a" :href="job.sourceUrl" target="_blank" rel="noopener noreferrer" :icon="Link">官方源视频</el-button>
             <el-button v-if="['queued', 'preparing', 'running', 'post_processing'].includes(job.status)" :icon="VideoPause" :loading="busyJobId === job.id" @click="pause(job)">暂停</el-button>
             <el-button v-if="job.status === 'paused'" type="primary" plain :icon="VideoPlay" :loading="busyJobId === job.id" @click="resume(job)">继续</el-button>
             <el-button v-if="['queued', 'preparing', 'running', 'post_processing', 'paused'].includes(job.status)" type="danger" plain :icon="CircleClose" :loading="busyJobId === job.id" @click="cancel(job)">取消</el-button>
@@ -222,6 +248,7 @@ onMounted(() => void refreshAll())
           </div>
         </div>
       </article>
+      </section>
 
       <el-empty v-if="!jobs.loading && !jobs.items.length" :image-size="110" :description="statusFilter === 'all' && !typeFilter ? '还没有任务，从视频详情页创建下载或分析任务' : '当前筛选条件下没有任务'">
         <el-button v-if="statusFilter === 'all' && !typeFilter" type="primary" @click="$router.push('/')">解析一个视频</el-button>
@@ -258,6 +285,7 @@ onMounted(() => void refreshAll())
 .filter-bar > span { padding-right: 8px; color: var(--text-tertiary); font-size: 12px; }
 .jobs-error { margin-bottom: 15px; }
 .job-list { display: grid; gap: 10px; min-height: 240px; }
+.job-group { display: grid; gap: 8px; }.job-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 4px 1px; }.job-group-heading strong, .job-group-heading span { display: block; }.job-group-heading span { margin-top: 2px; color: var(--text-tertiary); font-size: 10px; }.job-group-heading a { display: inline-flex; align-items: center; gap: 5px; color: var(--brand); font-size: 11px; font-weight: 650; text-decoration: none; }
 .job-card { padding: 16px; }
 .job-top { display: grid; grid-template-columns: auto 1fr auto; gap: 13px; align-items: start; }
 .type-icon { display: grid; place-items: center; width: 43px; height: 43px; border-radius: 12px; background: var(--brand-soft); color: var(--brand); }.type-icon .el-icon { font-size: 21px; }
