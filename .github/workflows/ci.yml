@@ -179,6 +179,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export BACKEND_CPUS=2.0
           cleanup() {
             status=$?
             if [ "$status" -ne 0 ]; then
