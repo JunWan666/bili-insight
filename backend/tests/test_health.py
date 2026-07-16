@@ -17,7 +17,7 @@ async def test_health_and_readiness_are_available_without_credentials(
     client, _ = api_client
     health = await client.get("/api/v1/health")
     assert health.status_code == 200
-    assert health.json() == {"status": "ok", "version": "1.2.3"}
+    assert health.json() == {"status": "ok", "version": "1.2.4"}
     assert health.headers["X-Content-Type-Options"] == "nosniff"
     ready = await client.get("/api/v1/health/ready")
     assert ready.status_code == 200

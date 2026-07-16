@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { settingsSections } from '@/config/settingsSections'
 import { pinia } from '@/stores'
 import { useAppAuthStore } from '@/stores/appAuth'
 
@@ -41,10 +42,15 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/settings',
-    name: 'settings',
-    component: () => import('@/views/SettingsView.vue'),
-    meta: { title: '设置' },
+    redirect: (route) => ({ path: '/settings/auth', query: route.query }),
   },
+  ...settingsSections.map((section): RouteRecordRaw => ({
+    path: `/settings/${section.value}`,
+    name: `settings-${section.value}`,
+    component: () => import('@/views/SettingsView.vue'),
+    props: { section: section.value },
+    meta: { title: section.pageTitle },
+  })),
   {
     path: '/diagnostics',
     name: 'diagnostics',

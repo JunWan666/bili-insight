@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -19,7 +19,7 @@ import { toApiError, type ApiError } from '@/api/errors'
 import AuthStatusBadge from '@/components/AuthStatusBadge.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import RequestError from '@/components/RequestError.vue'
-import { isSettingsSection, settingsSections, type SettingsSection } from '@/config/settingsSections'
+import { isSettingsSection, settingsSectionPath, settingsSections, type SettingsSection } from '@/config/settingsSections'
 import { useAuthStore } from '@/stores/auth'
 import { useAppAuthStore } from '@/stores/appAuth'
 import { useVideosStore } from '@/stores/videos'
@@ -29,10 +29,12 @@ import { safeVideoReturnPath } from '@/utils/safeReturnPath'
 
 const route = useRoute()
 const router = useRouter()
+const props = defineProps<{ section: SettingsSection }>()
 const auth = useAuthStore()
 const appAuth = useAppAuthStore()
 const videos = useVideosStore()
-const activeSection = ref<SettingsSection>('auth')
+const activeSection = computed(() => props.section)
+const activeSectionInfo = computed(() => settingsSections.find((section) => section.value === activeSection.value)!)
 const settings = ref<AppSettings | null>(null)
 const original = ref('')
 const settingsLoading = ref(false)
@@ -57,11 +59,7 @@ const rateLimitMbps = computed({
 })
 
 function setSection(section: SettingsSection): void {
-  activeSection.value = section
-  const query = { ...route.query }
-  if (section === 'auth') delete query.section
-  else query.section = section
-  void router.replace({ query })
+  void router.push({ path: settingsSectionPath(section), query: route.query })
 }
 
 function handleSectionChange(section: string): void {
@@ -178,26 +176,22 @@ async function saveSettings(): Promise<void> {
   finally { saving.value = false }
 }
 
-watch(() => route.query.section, (section) => {
-  activeSection.value = isSettingsSection(section) ? section : 'auth'
-}, { immediate: true })
-
 onMounted(() => { void auth.load(); void loadSettings() })
 </script>
 
 <template>
   <div class="settings-view">
-    <PageHeader title="设置" description="身份凭据由服务端安全管理；下载、存储与分析偏好对后续任务生效。" eyebrow="PREFERENCES">
+    <PageHeader :title="activeSectionInfo.pageTitle" :description="activeSectionInfo.description" eyebrow="PREFERENCES">
       <template #actions><el-button :icon="Monitor" @click="$router.push('/diagnostics')">关于与诊断</el-button></template>
     </PageHeader>
 
     <div class="settings-section-switcher surface-card">
       <div>
         <span>设置分组</span>
-        <small>{{ settingsSections.find((section) => section.value === activeSection)?.description }}</small>
+        <small>{{ activeSectionInfo.description }}</small>
       </div>
       <el-select :model-value="activeSection" data-testid="settings-section-select" aria-label="设置分组" @change="handleSectionChange">
-        <el-option v-for="section in settingsSections" :key="section.value" :label="section.label" :value="section.value" />
+        <el-option v-for="item in settingsSections" :key="item.value" :label="item.label" :value="item.value" />
       </el-select>
     </div>
 

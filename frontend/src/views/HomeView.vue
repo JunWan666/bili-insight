@@ -81,24 +81,19 @@ function selectMode(mode: AccessMode): void {
   <div class="home-view">
     <section class="workbench">
       <header class="hero-copy">
-        <div class="hero-signal hero-signal-left" aria-hidden="true"><i v-for="index in 7" :key="index" /></div>
-        <div class="hero-signal hero-signal-right" aria-hidden="true"><i v-for="index in 7" :key="index" /></div>
-        <p class="eyebrow">LOCAL MEDIA WORKBENCH</p>
+        <div class="hero-mark" aria-hidden="true"><span /><i /><span /></div>
         <h1>从一个链接开始，<br><span>看清视频的每一层。</span></h1>
         <p class="lead">解析实际可访问的音视频规格，按需下载、合并并生成可追踪的内容与媒体分析。</p>
       </header>
 
-      <div class="parse-panel surface-card">
-        <div class="panel-trace" aria-hidden="true"><i /><i /><i /><span /></div>
-        <div class="panel-heading">
-          <div>
-            <span class="step-label">新建解析</span>
-            <h2>粘贴 Bilibili 视频链接</h2>
-          </div>
+      <div class="parse-panel">
+        <div class="parse-meta">
+          <span class="parse-rule" aria-hidden="true" />
           <AuthStatusBadge :status="auth.status" :loading="auth.loading" />
         </div>
 
         <form novalidate @submit.prevent="parseVideo">
+          <h2 class="sr-only">粘贴 Bilibili 视频链接</h2>
           <label class="sr-only" for="video-url">Bilibili 视频链接、BV/AV 号或 ss/ep 标识</label>
           <div class="input-row" :class="{ invalid: validationMessage }">
             <el-input
@@ -153,7 +148,7 @@ function selectMode(mode: AccessMode): void {
       </div>
 
       <footer class="workflow-copy">
-        <span class="step-label">工作流</span>
+        <span class="workflow-line" aria-hidden="true" />
         <h2>解析之后，你可以继续</h2>
         <p>所有耗时操作进入任务队列，进度、失败原因和产物都可追踪。</p>
       </footer>
@@ -174,21 +169,14 @@ function selectMode(mode: AccessMode): void {
   width: min(1120px, 100%);
   gap: 22px;
 }
-.eyebrow, .step-label { color: var(--brand); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .hero-copy { position: relative; text-align: center; }
-.hero-signal { position: absolute; top: 30px; display: flex; align-items: center; gap: 5px; width: 150px; height: 42px; padding-inline: 12px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); opacity: .72; }
-.hero-signal::after { flex: 1; height: 1px; background: var(--line); content: ''; }
-.hero-signal i { width: 2px; border-radius: 2px; background: var(--brand); }
-.hero-signal i:nth-child(1), .hero-signal i:nth-child(7) { height: 6px; }.hero-signal i:nth-child(2), .hero-signal i:nth-child(6) { height: 13px; }.hero-signal i:nth-child(3), .hero-signal i:nth-child(5) { height: 21px; }.hero-signal i:nth-child(4) { height: 30px; background: var(--accent); }
-.hero-signal-left { left: 18px; }.hero-signal-right { right: 18px; transform: scaleX(-1); }
+.hero-mark { display: flex; align-items: center; justify-content: center; gap: 7px; width: 94px; margin: 0 auto 12px; }
+.hero-mark span { width: 32px; height: 1px; background: var(--line); }.hero-mark i { width: 7px; height: 7px; border: 2px solid var(--brand); border-radius: 50%; }
 .hero-copy h1 { margin: 10px 0 13px; font-size: 52px; line-height: 1.06; letter-spacing: 0; }
 .hero-copy h1 span { color: var(--brand); }
 .lead { max-width: 720px; margin: 0 auto; color: var(--text-secondary); font-size: 15px; line-height: 1.6; }
-.parse-panel { position: relative; padding: 22px; border-radius: 14px; }
-.panel-trace { position: absolute; top: -1px; left: 22px; display: flex; align-items: center; gap: 5px; width: 108px; height: 1px; }
-.panel-trace i { width: 5px; height: 5px; border: 1px solid var(--surface); border-radius: 50%; background: var(--brand); }.panel-trace i:nth-child(2) { background: var(--accent); }.panel-trace span { flex: 1; height: 1px; background: var(--brand); }
-.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
-.panel-heading h2 { margin: 5px 0 0; font-size: 18px; }
+.parse-panel { padding-top: 16px; border-top: 1px solid var(--line); }
+.parse-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }.parse-rule { width: 44px; height: 2px; background: var(--brand); }
 .input-row { display: flex; gap: 8px; }
 .input-row :deep(.el-input__wrapper) { min-height: 52px; }
 .input-row.invalid :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px var(--danger) inset; }
@@ -211,29 +199,27 @@ function selectMode(mode: AccessMode): void {
 .auth-explanation { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 8px; background: var(--surface-muted); color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
 .parse-button { width: min(380px, 100%); min-height: 52px; margin: 0; }
 .parse-error { margin-top: 14px; }
-.workflow-copy { padding: 2px 4px 0; }
-.workflow-copy h2 { margin: 5px 0 4px; font-size: 23px; letter-spacing: 0; }
+.workflow-copy { padding: 1px 4px 0; }
+.workflow-line { display: block; width: 28px; height: 2px; margin-bottom: 8px; background: var(--accent); }
+.workflow-copy h2 { margin: 0 0 4px; font-size: 23px; letter-spacing: 0; }
 .workflow-copy p { margin: 0; color: var(--text-secondary); line-height: 1.5; }
 
 @media (max-width: 1365px) {
   .home-view { min-height: calc(100dvh - 60px); }
   .workbench { gap: 18px; }
   .hero-copy h1 { font-size: 44px; }
-  .parse-panel { padding: 19px; }
+  .parse-panel { padding-top: 14px; }
   .mode-options button { min-height: 68px; }
-  .hero-signal { display: none; }
 }
 
 @media (max-width: 767px) {
   .home-view { min-height: calc(100dvh - 174px); overflow: visible; }
-  .workbench { gap: 16px; }
-  .hero-copy h1 { margin: 7px 0 8px; font-size: 32px; line-height: 1.08; }
+  .workbench { gap: 10px; }
+  .hero-mark { width: 72px; margin-bottom: 4px; }
+  .hero-copy h1 { margin: 4px 0 6px; font-size: 32px; line-height: 1.08; }
   .lead { font-size: 12px; line-height: 1.45; }
-  .parse-panel { padding: 15px; border-radius: 14px; }
-  .panel-trace { left: 15px; }
-  .panel-heading { margin-bottom: 12px; }
-  .panel-heading h2 { font-size: 16px; }
-  .panel-heading :deep(.auth-badge) { font-size: 10px; }
+  .parse-panel { padding-top: 12px; }
+  .parse-meta { margin-bottom: 6px; }.parse-meta :deep(.auth-badge) { font-size: 10px; }
   .input-row { display: grid; grid-template-columns: 1fr auto; }
   .input-row .el-input { grid-column: 1 / -1; }
   .paste-button { min-width: 0; }

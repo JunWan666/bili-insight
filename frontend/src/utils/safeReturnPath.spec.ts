@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { safeReturnPath, safeVideoReturnPath } from './safeReturnPath'
 
 describe('safeReturnPath', () => {
-  it.each(['/', '/jobs', '/artifacts?page=2', '/settings?section=account', '/diagnostics'])(
+  it.each(['/', '/jobs', '/artifacts?page=2', '/settings/account', '/diagnostics'])(
     'allows a known local application route %s',
     (value) => expect(safeReturnPath(value)).toBe(value),
   )

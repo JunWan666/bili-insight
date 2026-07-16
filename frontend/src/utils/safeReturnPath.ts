@@ -1,5 +1,5 @@
 const videoPath = /^\/videos\/[A-Za-z0-9-]{1,64}$/
-const appPath = /^\/(?:|videos\/[A-Za-z0-9-]{1,64}|jobs|artifacts|settings|diagnostics)$/
+const appPath = /^\/(?:|videos\/[A-Za-z0-9-]{1,64}|jobs|artifacts|settings(?:\/(?:account|auth|download|storage|analysis|network|privacy))?|diagnostics)$/
 const controlCharacters = /[\u0000-\u001F\u007F]/
 
 function localTarget(value: unknown): URL | null {

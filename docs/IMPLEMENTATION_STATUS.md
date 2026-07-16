@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-当前版本达到本地单用户/可信环境的 Production Ready 标准。`v1.2.3` 在单屏解析工作台中加入低干扰媒体信号装饰，将最近解析收敛为桌面四列起步的高密度信息卡，并把设置分组迁入可展开的侧栏二级菜单；移动端使用紧凑分组选择器保持全部设置可达。
+当前版本达到本地单用户/可信环境的 Production Ready 标准。`v1.2.4` 进一步移除解析页冗余英文标签与卡片外壳，将最近解析改为 1440 桌面五列竖向媒体卡，并把七个设置分组拆分为独立路径；侧栏二级菜单与一级菜单共享图标、尺寸和激活样式。
 
 ## 当前阶段
 
@@ -15,7 +15,7 @@
 | 下载、任务与产物 | verified | DASH 下载、合并、FFprobe、暂停恢复、重试、任务批量删除、最近解析安全删除、产物折叠分组、Range 与删除测试通过 |
 | 媒体与内容分析 | verified | 基础、媒体、音频、字幕、ASR/OCR 适配、镜头、摘要、编辑和导出链路通过 |
 | 在线播放预览 | verified | Shaka 组件、静态 SegmentBase MPD、视频与独立音轨预览、同源 Range 代理、TTL/限额、强制刷新、登录态清理、安全故障注入及真实 4K 播放通过 |
-| Vue 页面与移动端 | verified | 单屏解析工作台自然装饰、最近解析高密度网格、桌面设置二级菜单、平板/手机紧凑分组选择器、五项移动导航和预览弹窗通过完整跨浏览器矩阵 |
+| Vue 页面与移动端 | verified | 简约单屏解析工作台、最近解析五列竖向网格、同风格设置二级菜单、七个独立设置路径、平板/手机紧凑分组选择器和五项移动导航通过完整跨浏览器矩阵 |
 | Docker、运维与安全 | verified | 最新生产镜像重建、`0006_application_auth` 实际迁移、健康检查、CDN 端口窄放行和预览代理安全测试通过 |
 | 全量测试与 PRD 审计 | verified | 原 AC 与新增 AC-PARSE-06、AC-PREVIEW、AC-MOBILE-06 均具备自动化及真实运行证据 |
 
@@ -73,7 +73,7 @@
 | 后端静态检查 | Ruff check、Ruff format check、mypy strict 全部通过 |
 | 前端单元测试 | 19 个文件、106 项 Vitest 全部通过 |
 | 前端静态与构建 | ESLint、Vue/TypeScript typecheck、Vite production build 全部通过 |
-| 完整 Playwright 矩阵 | 203 项全部按预期通过或跳过；Chromium 360/390/768/1440、WebKit 手机/桌面和 Firefox 桌面 0 failed |
+| 完整 Playwright 矩阵 | 203 项：180 passed、23 项按设备能力预期 skipped；Chromium 360/390/768/1440、WebKit 手机/桌面和 Firefox 桌面 0 failed |
 | Docker 与迁移 | 最终源码已在 CI 中构建前后端生产镜像并完成 Compose 启动、健康与持久化验收；本机两个容器 healthy，Alembic 为 `0006_application_auth (head)` |
 | 真实番剧播放 | `ss28747` 年度大会员解析得到 19 路视频、3 路音频；4K H.264 + AAC 在 Chromium 中实际播放、暂停和拖动通过 |
 | 依赖与仓库安全 | Python 两组 `pip-audit` 无已知漏洞；npm 官方 registry 审计 0 vulnerabilities；仓库凭据扫描通过 |
@@ -166,7 +166,7 @@
 
 ## 本轮验收结果
 
-- 完整 Playwright 七项目矩阵、最近解析四列密度门禁、设置侧栏二级菜单、手机设置选择器与保存栏层级复验均已完成。
+- 完整 Playwright 七项目矩阵、最近解析五列竖向卡门禁、七个独立设置路径、同风格侧栏二级菜单和手机单屏复验均已完成。
 - 当前无阻断交付项；剩余边界见下节。
 
 ## 非阻断验证边界

@@ -309,7 +309,7 @@ onMounted(() => { void loadArtifacts(); void loadDisk() })
     <section v-if="disk" class="disk-card surface-card">
       <span class="disk-icon"><Files /></span>
       <div class="disk-copy"><div><strong>本机存储</strong><span>已用 {{ formatBytes(usedBytes) }} / {{ formatBytes(disk.totalBytes) }}</span></div><el-progress :percentage="usagePercent" :stroke-width="8" :show-text="false" :status="usagePercent >= 90 ? 'exception' : usagePercent >= 75 ? 'warning' : undefined" /><small>受管产物 {{ formatBytes(disk.artifactBytes) }} · 可用 {{ formatBytes(disk.freeBytes) }}</small></div>
-      <RouterLink to="/settings?section=storage">存储设置</RouterLink>
+      <RouterLink to="/settings/storage">存储设置</RouterLink>
     </section>
 
     <section class="filters surface-card">

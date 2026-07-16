@@ -86,7 +86,7 @@ onMounted(() => void load())
 
     <section v-if="diagnosticsDisabled && !diagnostics" class="diagnostics-disabled surface-card" role="status">
       <el-icon><Warning /></el-icon>
-      <div><h2>详细诊断已关闭</h2><p>组件版本、队列和磁盘指标不会被采集或导出；服务的基础健康检查仍保持可用。</p><RouterLink to="/settings">前往隐私设置启用诊断</RouterLink></div>
+      <div><h2>详细诊断已关闭</h2><p>组件版本、队列和磁盘指标不会被采集或导出；服务的基础健康检查仍保持可用。</p><RouterLink to="/settings/privacy">前往隐私设置启用诊断</RouterLink></div>
     </section>
     <RequestError v-else-if="error && !diagnostics" :error="error" @retry="load" />
 

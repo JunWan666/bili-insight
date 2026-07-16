@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { Component as VueComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Compass,
   Clock,
   ArrowDown,
+  Connection,
+  Cpu,
   DocumentChecked,
+  Download,
   Expand,
   Files,
   Film,
   Fold,
+  Key,
+  Lock,
   Monitor,
   Setting,
   SwitchButton,
@@ -17,7 +23,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import AuthStatusBadge from '@/components/AuthStatusBadge.vue'
-import { isSettingsSection, settingsSections, type SettingsSection } from '@/config/settingsSections'
+import { isSettingsSection, settingsSectionPath, settingsSections, type SettingsSection } from '@/config/settingsSections'
 import { useAuthStore } from '@/stores/auth'
 import { useAppAuthStore } from '@/stores/appAuth'
 import { useJobsStore } from '@/stores/jobs'
@@ -38,8 +44,17 @@ const navigation = [
   { path: '/jobs', label: '任务', icon: DocumentChecked, badge: true, testId: 'nav-jobs' },
   { path: '/artifacts', label: '产物', icon: Files, testId: 'nav-artifacts' },
 ]
-const settingsNavigation = { path: '/settings', label: '设置', icon: Setting, testId: 'nav-settings' }
+const settingsNavigation = { path: '/settings/auth', label: '设置', icon: Setting, testId: 'nav-settings' }
 const mobileNavigation = [...navigation, settingsNavigation]
+const settingsSectionIcons: Record<SettingsSection, VueComponent> = {
+  account: User,
+  auth: Key,
+  download: Download,
+  storage: Files,
+  analysis: Cpu,
+  network: Connection,
+  privacy: Lock,
+}
 
 const activePath = computed(() => {
   if (route.path.startsWith('/videos/')) return '/'
@@ -47,7 +62,7 @@ const activePath = computed(() => {
   return navigation.find((item) => route.path.startsWith(item.path) && item.path !== '/')?.path ?? '/'
 })
 const activeSettingsSection = computed<SettingsSection>(() => (
-  isSettingsSection(route.query.section) ? route.query.section : 'auth'
+  isSettingsSection(route.path.split('/')[2]) ? route.path.split('/')[2] as SettingsSection : 'auth'
 ))
 
 function navigate(path: string): void {
@@ -61,12 +76,12 @@ function toggleSidebar(): void {
 
 function toggleSettings(): void {
   if (sidebarCollapsed.value) {
-    void router.push('/settings')
+    void router.push('/settings/auth')
     return
   }
   if (!route.path.startsWith('/settings')) {
     settingsExpanded.value = true
-    void router.push('/settings')
+    void router.push('/settings/auth')
     return
   }
   settingsExpanded.value = !settingsExpanded.value
@@ -74,7 +89,7 @@ function toggleSettings(): void {
 
 function navigateSettings(section: SettingsSection): void {
   settingsExpanded.value = true
-  void router.push({ path: '/settings', query: section === 'auth' ? {} : { section } })
+  void router.push({ path: settingsSectionPath(section), query: route.query })
 }
 
 watch(settingsExpanded, (expanded) => {
@@ -186,8 +201,8 @@ onBeforeUnmount(() => {
               :class="{ active: activePath === '/settings' && activeSettingsSection === section.value }"
               @click="navigateSettings(section.value)"
             >
+              <el-icon><component :is="settingsSectionIcons[section.value]" /></el-icon>
               <span>{{ section.label }}</span>
-              <small>{{ section.description }}</small>
             </button>
           </div>
         </div>
@@ -204,7 +219,7 @@ onBeforeUnmount(() => {
           <el-icon><Monitor /></el-icon><span>关于与诊断</span>
         </button>
       </el-tooltip>
-      <RouterLink class="auth-card" to="/settings">
+      <RouterLink class="auth-card" to="/settings/auth">
         <AuthStatusBadge :status="auth.status" :loading="auth.loading" compact />
         <small>{{ auth.status?.maskedAccountName || 'Cookie 仅保存在本机服务端' }}</small>
       </RouterLink>
@@ -212,7 +227,7 @@ onBeforeUnmount(() => {
 
     <header class="mobile-header">
       <RouterLink class="mobile-brand" to="/"><span class="brand-mark"><Film /></span><strong>Bili Insight</strong></RouterLink>
-      <RouterLink to="/settings"><AuthStatusBadge :status="auth.status" :loading="auth.loading" compact /></RouterLink>
+      <RouterLink to="/settings/auth"><AuthStatusBadge :status="auth.status" :loading="auth.loading" compact /></RouterLink>
     </header>
 
     <main class="main-content" :class="{ 'is-video-workspace': route.path.startsWith('/videos/'), 'is-sidebar-collapsed': sidebarCollapsed }">
@@ -273,15 +288,12 @@ onBeforeUnmount(() => {
 .desktop-nav button:hover, .diagnostics-link:hover { background: var(--surface-muted); color: var(--text-primary); }
 .desktop-nav button.active { background: var(--brand-soft); color: var(--brand); }
 .desktop-nav .el-icon, .diagnostics-link .el-icon { font-size: 20px; }
-.settings-nav-group { display: grid; gap: 3px; }
+.settings-nav-group { display: grid; gap: 4px; }
 .settings-parent .expand-indicator { margin-left: auto; font-size: 14px; transition: transform .18s ease; }
 .settings-nav-group.open .expand-indicator { transform: rotate(180deg); }
-.settings-subnav { position: relative; display: grid; gap: 1px; padding: 2px 0 4px 41px; }
-.settings-subnav::before { position: absolute; inset: 4px auto 8px 24px; width: 1px; background: var(--line); content: ''; }
-.desktop-nav .settings-subnav button { display: grid; align-content: center; gap: 1px; min-height: 35px; padding: 5px 9px; border-radius: 8px; font-weight: 650; }
-.settings-subnav button span { font-size: 11px; }
-.settings-subnav button small { overflow: hidden; color: var(--text-tertiary); font-size: 9px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.settings-subnav button.active small { color: color-mix(in srgb, var(--brand) 68%, var(--text-tertiary)); }
+.settings-subnav { display: grid; gap: 4px; padding: 0 0 2px 12px; }
+.desktop-nav .settings-subnav button { min-height: 42px; padding: 0 14px; border-radius: 11px; font-size: 12px; }
+.settings-subnav .el-icon { font-size: 17px; }
 .nav-badge { margin-left: auto; min-width: 22px; padding: 2px 6px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 11px; text-align: center; }
 .sidebar-spacer { flex: 1; }
 .admin-session { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; margin-bottom: 9px; padding: 10px 11px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }

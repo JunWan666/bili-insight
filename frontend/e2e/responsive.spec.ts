@@ -7,12 +7,12 @@ interface PageContract {
 }
 
 const pageContracts: PageContract[] = [
-  { path: '/', heading: '粘贴 Bilibili 视频链接' },
+  { path: '/', heading: '从一个链接开始' },
   { path: '/recent', heading: '最近解析' },
   { path: '/videos/video-e2e', heading: 'E2E 测试专用：响应式视频解析样本' },
   { path: '/jobs', heading: '任务中心' },
   { path: '/artifacts', heading: '产物与历史' },
-  { path: '/settings', heading: '设置' },
+  { path: '/settings/auth', heading: '登录态设置' },
   { path: '/diagnostics', heading: '关于与诊断' },
 ]
 
@@ -92,7 +92,7 @@ test('桌面工作区充分利用宽度且主要操作位于首屏', async ({ pa
     { path: '/recent', view: '.recent-view', primary: '.recent-card:first-of-type' },
     { path: '/jobs', view: '.jobs-view', primary: '.job-card:first-of-type' },
     { path: '/artifacts', view: '.artifacts-view', primary: '.artifact-content' },
-    { path: '/settings', view: '.settings-view', primary: '.auth-actions' },
+    { path: '/settings/auth', view: '.settings-view', primary: '.auth-actions' },
     { path: '/diagnostics', view: '.diagnostics-view', primary: '.metrics-grid' },
   ]
 
@@ -163,12 +163,13 @@ test('桌面最近解析采用高密度卡片网格', async ({ page }, testInfo)
   const grid = page.locator('.recent-grid')
   await expect(grid).toBeVisible()
   const columns = await grid.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length)
-  expect(columns, '1440 桌面最近解析应至少容纳四列').toBeGreaterThanOrEqual(4)
+  expect(columns, '1440 桌面最近解析应容纳五列').toBe(5)
 
   const card = page.getByTestId('recent-card').first()
   const cardBox = await card.boundingBox()
   expect(cardBox, '最近解析卡片应具有可测量区域').not.toBeNull()
-  expect(cardBox?.height ?? 999, '最近解析卡片不应保留过多纵向留白').toBeLessThanOrEqual(145)
+  expect(cardBox?.height ?? 0, '最近解析卡片应具有足够的媒体展示面积').toBeGreaterThanOrEqual(220)
+  expect(cardBox?.height ?? 999, '最近解析卡片不应过度拉长').toBeLessThanOrEqual(290)
   await expect(card).toContainText('投稿')
   await expect(card).toContainText('BV1FYT5zkE1q')
 })
@@ -177,12 +178,18 @@ test('桌面设置分组由侧栏二级菜单驱动', async ({ page }, testInfo)
   const viewportWidth = testInfo.project.use.viewport?.width ?? 0
   test.skip(viewportWidth < 1200, '仅展开侧栏布局执行设置二级菜单门禁')
 
-  await page.goto('/settings')
+  await page.goto('/settings/auth')
   await expect(page.getByTestId('settings-subnav')).toBeVisible()
   await expect(page.locator('.settings-nav')).toHaveCount(0)
   await page.getByTestId('settings-section-download-desktop').click()
-  await expect(page).toHaveURL(/\/settings\?section=download$/)
+  await expect(page).toHaveURL(/\/settings\/download$/)
+  await expect(page.getByRole('heading', { name: '下载设置' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '下载默认值' })).toBeVisible()
+
+  const parentBox = await page.getByTestId('nav-settings-desktop').boundingBox()
+  const childBox = await page.getByTestId('settings-section-download-desktop').boundingBox()
+  expect(Math.abs((parentBox?.height ?? 0) - (childBox?.height ?? 0)), '设置二级菜单应与一级菜单保持相近高度').toBeLessThanOrEqual(8)
+  await expect(page.getByTestId('settings-section-download-desktop').locator('.el-icon')).toBeVisible()
 
   await page.getByTestId('nav-settings-desktop').click()
   await expect(page.getByTestId('settings-subnav')).toBeHidden()
@@ -253,7 +260,7 @@ test('触控视口的关键操作目标至少为 44×44 px', async ({ page }, te
   await expect(page.getByTestId('analysis-result-asr')).toBeVisible()
   await assertTouchTarget(page.getByTestId('analysis-result-asr').getByRole('link', { name: '导出 1' }), '导出分析产物')
 
-  await page.goto('/settings')
+  await page.goto('/settings/auth')
   await assertTouchTarget(page.getByRole('button', { name: '选择文件' }), '选择 Cookie 文件')
   await assertTouchTarget(page.getByTestId('settings-section-select'), '设置分组选择器')
 
@@ -284,9 +291,10 @@ test('手机关键流程可直接触控且不依赖 hover', async ({ page, testA
   await page.getByTestId('access-mode-anonymous').tap()
   await expect(page.getByTestId('access-mode-anonymous')).toHaveAttribute('aria-pressed', 'true')
   await page.getByTestId('nav-settings-mobile').tap()
-  await expect(page).toHaveURL(/\/settings$/)
+  await expect(page).toHaveURL(/\/settings\/auth$/)
   await page.getByTestId('settings-section-select').tap()
   await page.getByRole('option', { name: '下载', exact: true }).tap()
+  await expect(page).toHaveURL(/\/settings\/download$/)
   await expect(page.getByRole('heading', { name: '下载默认值' })).toBeVisible()
 
   await page.goto('/videos/video-e2e')

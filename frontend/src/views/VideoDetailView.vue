@@ -121,7 +121,7 @@ async function changePart(partId: string): Promise<void> {
 async function changeAccess(mode: 'anonymous' | 'authenticated'): Promise<void> {
   if (!video.value || !selectedPart.value) return
   if (mode === 'authenticated' && !auth.isAuthenticated) {
-    await router.push({ name: 'settings', query: { section: 'auth', returnTo: route.fullPath } })
+    await router.push({ name: 'settings-auth', query: { returnTo: route.fullPath } })
     return
   }
   refreshingIdentity.value = true

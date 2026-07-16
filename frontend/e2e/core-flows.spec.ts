@@ -202,7 +202,7 @@ test('可从媒体选择区直接创建纯音频下载任务', async ({ page, te
 test('详情页上传 Cookie 后安全返回并自动执行一次登录态重解析', async ({ page }) => {
   await page.goto('/videos/video-e2e')
   await activate(page.getByTestId('supplement-auth-quality'), page)
-  await expect(page).toHaveURL(/\/settings\?.*returnTo=/)
+  await expect(page).toHaveURL(/\/settings\/auth\?.*returnTo=/)
 
   await page.getByTestId('cookie-file-input').setInputFiles({
     name: 'browser-session.test.json',
@@ -218,7 +218,7 @@ test('详情页上传 Cookie 后安全返回并自动执行一次登录态重解
 })
 
 test('设置页拒绝外域 returnTo，Cookie 上传后仍停留在站内', async ({ page }) => {
-  await page.goto(`/settings?returnTo=${encodeURIComponent('//evil.example/steal')}`)
+  await page.goto(`/settings/auth?returnTo=${encodeURIComponent('//evil.example/steal')}`)
   await page.getByTestId('cookie-file-input').setInputFiles({
     name: 'browser-session.test.json',
     mimeType: 'application/json',
@@ -226,7 +226,7 @@ test('设置页拒绝外域 returnTo，Cookie 上传后仍停留在站内', asyn
   })
   await activate(page.getByTestId('cookie-upload-submit'), page)
 
-  await expect(page).toHaveURL(/\/settings\?returnTo=/)
+  await expect(page).toHaveURL(/\/settings\/auth\?returnTo=/)
   expect(new URL(page.url()).hostname).toBe('127.0.0.1')
 })
 
@@ -464,7 +464,7 @@ test('最近解析页面保留紧凑的单项删除', async ({ page, testApi }) 
 })
 
 test('设置页可上传脱敏测试 Cookie 文件并彻底清除登录态', async ({ page, testApi }) => {
-  await page.goto('/settings')
+  await page.goto('/settings/auth')
   await expect(page.getByRole('heading', { name: 'Cookie 登录态' })).toBeVisible()
 
   const testOnlyCredentialMarker = 'not-a-real-credential-e2e-only'
@@ -550,7 +550,7 @@ test('产物中心支持批量选择并彻底删除文件', async ({ page, testA
 })
 
 test('设置分组可修改保存并进入诊断页导出脱敏报告', async ({ page, testApi }) => {
-  await page.goto('/settings')
+  await page.goto('/settings/auth')
 
   const settingsSections = [
     { label: '下载', heading: '下载默认值' },
