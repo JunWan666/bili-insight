@@ -12,5 +12,5 @@ import { Compass } from '@element-plus/icons-vue'
 </template>
 
 <style scoped>
-.not-found { display: grid; place-items: center; max-width: 620px; min-height: 420px; margin: 8vh auto 0; padding: 40px; text-align: center; }.not-found > span { color: var(--brand); font-size: clamp(72px, 13vw, 130px); font-weight: 850; letter-spacing: -.08em; line-height: 1; opacity: .18; }.not-found h1 { margin: -15px 0 0; font-size: 25px; }.not-found p { margin: 10px 0 24px; color: var(--text-secondary); }
+.not-found { display: grid; place-items: center; max-width: 620px; min-height: 420px; margin: 8vh auto 0; padding: 40px; text-align: center; }.not-found > span { color: var(--brand); font-size: clamp(72px, 13vw, 130px); font-weight: 850; letter-spacing: 0; line-height: 1; opacity: .18; }.not-found h1 { margin: -15px 0 0; font-size: 25px; }.not-found p { margin: 10px 0 24px; color: var(--text-secondary); }
 </style>

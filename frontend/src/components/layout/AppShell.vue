@@ -278,7 +278,7 @@ onBeforeUnmount(() => {
 .brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: var(--brand); color: white; box-shadow: 0 8px 20px rgba(67, 86, 201, .24); }
 .brand-mark svg { width: 22px; height: 22px; }
 .brand-copy { display: grid; gap: 2px; }
-.brand-copy strong { font-size: 18px; letter-spacing: -.02em; }
+.brand-copy strong { font-size: 18px; letter-spacing: 0; }
 .brand-copy small { color: var(--text-tertiary); font-size: 11px; }
 .desktop-nav { display: grid; gap: 6px; }
 .desktop-nav button, .diagnostics-link {
