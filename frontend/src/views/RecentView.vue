@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Clock, Delete, Link, Refresh, VideoPlay } from '@element-plus/icons-vue'
+import { Clock, Delete, Link, Refresh, User, VideoPlay } from '@element-plus/icons-vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useVideosStore } from '@/stores/videos'
 import type { RecentVideo } from '@/types/api'
@@ -12,6 +12,10 @@ const router = useRouter()
 const videos = useVideosStore()
 const loading = ref(true)
 const deletingId = ref<string | null>(null)
+
+function sourceLabel(video: RecentVideo): string {
+  return video.normalizedUrl.includes('/bangumi/') ? '番剧' : '投稿'
+}
 
 async function loadRecent(): Promise<void> {
   loading.value = true
@@ -72,13 +76,21 @@ onMounted(() => {
         </RouterLink>
         <div class="recent-content">
           <RouterLink :to="`/videos/${video.id}`" class="recent-title">{{ video.title }}</RouterLink>
-          <p>{{ video.ownerName }}</p>
-          <small><el-icon><Clock /></el-icon>{{ formatDate(video.parsedAt) }}</small>
+          <p><el-icon><User /></el-icon>{{ video.ownerName }}</p>
+          <div class="recent-meta">
+            <span>{{ sourceLabel(video) }}</span>
+            <span>{{ video.bvid }}</span>
+          </div>
           <div class="recent-actions">
-            <a :href="video.normalizedUrl" target="_blank" rel="noopener noreferrer"><el-icon><Link /></el-icon>官方源视频</a>
-            <el-tooltip content="删除解析记录" placement="top">
-              <el-button text type="danger" :icon="Delete" :loading="deletingId === video.id" aria-label="删除解析记录" @click="removeRecent(video)" />
-            </el-tooltip>
+            <small><el-icon><Clock /></el-icon>{{ formatDate(video.parsedAt) }}</small>
+            <div class="recent-action-icons">
+              <el-tooltip content="打开官方源视频" placement="top">
+                <a class="source-link" :href="video.normalizedUrl" target="_blank" rel="noopener noreferrer" aria-label="打开官方源视频"><el-icon><Link /></el-icon></a>
+              </el-tooltip>
+              <el-tooltip content="删除解析记录" placement="top">
+                <el-button text type="danger" :icon="Delete" :loading="deletingId === video.id" aria-label="删除解析记录" @click="removeRecent(video)" />
+              </el-tooltip>
+            </div>
           </div>
         </div>
       </article>
@@ -88,33 +100,32 @@ onMounted(() => {
 
 <style scoped>
 .recent-view { width: 100%; }
-.recent-grid, .recent-skeleton { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.recent-card { display: grid; grid-template-columns: minmax(140px, 42%) minmax(0, 1fr); min-height: 154px; overflow: hidden; }
+.recent-grid, .recent-skeleton { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.recent-card { display: grid; grid-template-columns: 104px minmax(0, 1fr); min-height: 136px; overflow: hidden; }
 .recent-cover { position: relative; min-width: 0; overflow: hidden; background: var(--surface-muted); }
 .recent-cover img { width: 100%; height: 100%; object-fit: cover; transition: transform .18s ease; }
 .recent-cover:hover img { transform: scale(1.025); }
 .recent-cover span { position: absolute; right: 8px; bottom: 8px; padding: 3px 6px; border-radius: 5px; background: rgba(18, 20, 25, .8); color: white; font-size: 10px; }
-.recent-content { display: flex; flex-direction: column; min-width: 0; padding: 13px; }
-.recent-title { display: -webkit-box; overflow: hidden; color: var(--text-primary); font-size: 14px; font-weight: 750; line-height: 1.45; text-decoration: none; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.recent-content { display: flex; flex-direction: column; min-width: 0; padding: 10px 11px; }
+.recent-title { display: -webkit-box; overflow: hidden; color: var(--text-primary); font-size: 13px; font-weight: 750; line-height: 1.38; text-decoration: none; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .recent-title:hover { color: var(--brand); }
-.recent-content p { margin: 9px 0 5px; overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.recent-content small { display: flex; align-items: center; gap: 5px; color: var(--text-tertiary); font-size: 11px; }
-.recent-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 8px; }
-.recent-actions a { display: inline-flex; align-items: center; gap: 4px; color: var(--brand); font-size: 11px; font-weight: 700; text-decoration: none; }
-.recent-actions .el-button { min-width: 40px; min-height: 40px; }
-.skeleton-item { width: 100%; height: 154px; border-radius: var(--radius-lg); }
-
-@media (max-width: 1399px) {
-  .recent-grid, .recent-skeleton { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+.recent-content p { display: flex; align-items: center; gap: 4px; margin: 5px 0 4px; overflow: hidden; color: var(--text-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }.recent-content p .el-icon { flex: 0 0 auto; }
+.recent-meta { display: flex; gap: 5px; margin-bottom: 4px; overflow: hidden; }.recent-meta span { min-width: 0; padding: 2px 5px; border-radius: 4px; background: var(--surface-muted); color: var(--text-tertiary); font-size: 9px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.recent-meta span:last-child { flex: 1; }
+.recent-content small { display: flex; align-items: center; gap: 4px; color: var(--text-tertiary); font-size: 10px; }
+.recent-actions { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-top: auto; }
+.recent-action-icons { display: flex; align-items: center; flex: 0 0 auto; gap: 1px; }
+.source-link { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: var(--brand); text-decoration: none; }.source-link:hover { background: var(--brand-soft); }
+.recent-actions .el-button { min-width: 32px; min-height: 32px; }
+.skeleton-item { width: 100%; height: 136px; border-radius: var(--radius-lg); }
 
 @media (max-width: 767px) {
   .recent-grid, .recent-skeleton { grid-template-columns: 1fr; gap: 10px; }
-  .recent-card { grid-template-columns: 132px minmax(0, 1fr); min-height: 138px; }
+  .recent-card { grid-template-columns: 120px minmax(0, 1fr); min-height: 132px; }
   .recent-content { padding: 11px; }
   .recent-content p { margin-top: 6px; }
+  .source-link { width: 44px; height: 44px; }
   .recent-actions .el-button { min-width: 44px; min-height: 44px; }
-  .skeleton-item { height: 138px; }
+  .skeleton-item { height: 132px; }
 }
 
 @media (max-width: 374px) {

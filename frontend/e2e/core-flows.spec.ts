@@ -18,6 +18,16 @@ function visibleText(page: Page, text: string): Locator {
   return page.getByText(text).filter({ visible: true }).first()
 }
 
+async function selectSettingsSection(page: Page, label: string): Promise<void> {
+  const viewport = page.viewportSize()
+  if (viewport && viewport.width >= 1200) {
+    await page.getByTestId('settings-subnav').getByRole('button', { name: new RegExp(`^${label}`) }).click()
+    return
+  }
+  await page.getByTestId('settings-section-select').click()
+  await page.getByRole('option', { name: label, exact: true }).click()
+}
+
 for (const scenario of [
   { mode: 'auto', authenticated: true, label: '自动' },
   { mode: 'anonymous', authenticated: true, label: '仅匿名' },
@@ -543,18 +553,18 @@ test('设置分组可修改保存并进入诊断页导出脱敏报告', async ({
   await page.goto('/settings')
 
   const settingsSections = [
-    { button: /^下载/, heading: '下载默认值' },
-    { button: /^存储/, heading: '存储与清理' },
-    { button: /^分析/, heading: '分析模型' },
-    { button: /^网络/, heading: '网络策略' },
-    { button: /^隐私/, heading: '隐私与历史' },
+    { label: '下载', heading: '下载默认值' },
+    { label: '存储', heading: '存储与清理' },
+    { label: '分析', heading: '分析模型' },
+    { label: '网络', heading: '网络策略' },
+    { label: '隐私', heading: '隐私与历史' },
   ]
   for (const section of settingsSections) {
-    await page.locator('.settings-nav').getByRole('button', { name: section.button }).click()
+    await selectSettingsSection(page, section.label)
     await expect(page.getByRole('heading', { name: section.heading })).toBeVisible()
   }
 
-  await page.locator('.settings-nav').getByRole('button', { name: /^下载/ }).click()
+  await selectSettingsSection(page, '下载')
   const filenameTemplate = page.locator('input[maxlength="180"]')
   await filenameTemplate.fill('{title}-{quality}-e2e')
   const saveButton = page.getByRole('button', { name: '保存设置' })

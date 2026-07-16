@@ -155,6 +155,41 @@ test('桌面工作区充分利用宽度且主要操作位于首屏', async ({ pa
   expect(detailLayout.workspaceBodyOverflow).toBe('auto')
 })
 
+test('桌面最近解析采用高密度卡片网格', async ({ page }, testInfo) => {
+  const viewportWidth = testInfo.project.use.viewport?.width ?? 0
+  test.skip(viewportWidth < 1200, '仅桌面宽屏布局执行卡片密度门禁')
+
+  await page.goto('/recent')
+  const grid = page.locator('.recent-grid')
+  await expect(grid).toBeVisible()
+  const columns = await grid.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length)
+  expect(columns, '1440 桌面最近解析应至少容纳四列').toBeGreaterThanOrEqual(4)
+
+  const card = page.getByTestId('recent-card').first()
+  const cardBox = await card.boundingBox()
+  expect(cardBox, '最近解析卡片应具有可测量区域').not.toBeNull()
+  expect(cardBox?.height ?? 999, '最近解析卡片不应保留过多纵向留白').toBeLessThanOrEqual(145)
+  await expect(card).toContainText('投稿')
+  await expect(card).toContainText('BV1FYT5zkE1q')
+})
+
+test('桌面设置分组由侧栏二级菜单驱动', async ({ page }, testInfo) => {
+  const viewportWidth = testInfo.project.use.viewport?.width ?? 0
+  test.skip(viewportWidth < 1200, '仅展开侧栏布局执行设置二级菜单门禁')
+
+  await page.goto('/settings')
+  await expect(page.getByTestId('settings-subnav')).toBeVisible()
+  await expect(page.locator('.settings-nav')).toHaveCount(0)
+  await page.getByTestId('settings-section-download-desktop').click()
+  await expect(page).toHaveURL(/\/settings\?section=download$/)
+  await expect(page.getByRole('heading', { name: '下载默认值' })).toBeVisible()
+
+  await page.getByTestId('nav-settings-desktop').click()
+  await expect(page.getByTestId('settings-subnav')).toBeHidden()
+  await page.getByTestId('nav-settings-desktop').click()
+  await expect(page.getByTestId('settings-subnav')).toBeVisible()
+})
+
 test('手机首屏展示链接输入、身份状态和解析操作', async ({ page }, testInfo) => {
   const viewportWidth = testInfo.project.use.viewport?.width ?? 0
   test.skip(!testInfo.project.use.hasTouch || viewportWidth >= 768, '仅手机触控布局执行首屏门禁')
@@ -220,7 +255,7 @@ test('触控视口的关键操作目标至少为 44×44 px', async ({ page }, te
 
   await page.goto('/settings')
   await assertTouchTarget(page.getByRole('button', { name: '选择文件' }), '选择 Cookie 文件')
-  await assertTouchTarget(page.locator('.settings-nav').getByRole('button', { name: /^下载/ }), '下载设置分组')
+  await assertTouchTarget(page.getByTestId('settings-section-select'), '设置分组选择器')
 
   await page.goto('/jobs')
   await assertTouchTarget(page.locator('.filter-controls .el-select').first(), '任务状态筛选')
@@ -250,7 +285,8 @@ test('手机关键流程可直接触控且不依赖 hover', async ({ page, testA
   await expect(page.getByTestId('access-mode-anonymous')).toHaveAttribute('aria-pressed', 'true')
   await page.getByTestId('nav-settings-mobile').tap()
   await expect(page).toHaveURL(/\/settings$/)
-  await page.locator('.settings-nav').getByRole('button', { name: /^下载/ }).tap()
+  await page.getByTestId('settings-section-select').tap()
+  await page.getByRole('option', { name: '下载', exact: true }).tap()
   await expect(page.getByRole('heading', { name: '下载默认值' })).toBeVisible()
 
   await page.goto('/videos/video-e2e')

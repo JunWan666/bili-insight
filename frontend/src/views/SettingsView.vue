@@ -4,10 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Check,
-  Connection,
-  Cpu,
   Delete,
-  Download,
   Files,
   Key,
   Lock,
@@ -15,7 +12,6 @@ import {
   Refresh,
   Setting,
   UploadFilled,
-  User,
   Warning,
 } from '@element-plus/icons-vue'
 import { settingsApi } from '@/api'
@@ -23,6 +19,7 @@ import { toApiError, type ApiError } from '@/api/errors'
 import AuthStatusBadge from '@/components/AuthStatusBadge.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import RequestError from '@/components/RequestError.vue'
+import { isSettingsSection, settingsSections, type SettingsSection } from '@/config/settingsSections'
 import { useAuthStore } from '@/stores/auth'
 import { useAppAuthStore } from '@/stores/appAuth'
 import { useVideosStore } from '@/stores/videos'
@@ -30,14 +27,12 @@ import type { AppSettings } from '@/types/api'
 import { formatBytes, formatDate } from '@/utils/format'
 import { safeVideoReturnPath } from '@/utils/safeReturnPath'
 
-type Section = 'account' | 'auth' | 'download' | 'storage' | 'analysis' | 'network' | 'privacy'
-
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const appAuth = useAppAuthStore()
 const videos = useVideosStore()
-const activeSection = ref<Section>('auth')
+const activeSection = ref<SettingsSection>('auth')
 const settings = ref<AppSettings | null>(null)
 const original = ref('')
 const settingsLoading = ref(false)
@@ -51,16 +46,6 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const passwordForm = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' })
 const passwordChanging = ref(false)
 
-const sections: Array<{ value: Section; label: string; description: string; icon: typeof Key }> = [
-  { value: 'account', label: '管理员', description: '应用账号与密码', icon: User },
-  { value: 'auth', label: '登录态', description: 'Cookie 上传与校验', icon: Key },
-  { value: 'download', label: '下载', description: '预设、并发与命名', icon: Download },
-  { value: 'storage', label: '存储', description: '目录、配额与清理', icon: Files },
-  { value: 'analysis', label: '分析', description: '模型、设备与采样', icon: Cpu },
-  { value: 'network', label: '网络', description: '超时、限速与间隔', icon: Connection },
-  { value: 'privacy', label: '隐私', description: '历史和诊断策略', icon: Lock },
-]
-
 const dirty = computed(() => settings.value !== null && JSON.stringify(settings.value) !== original.value)
 const quotaGb = computed({
   get: () => settings.value?.storage.quotaBytes == null ? null : Number((settings.value.storage.quotaBytes / 1024 ** 3).toFixed(2)),
@@ -71,9 +56,16 @@ const rateLimitMbps = computed({
   set: (value: number | null) => { if (settings.value) settings.value.network.rateLimitBytesPerSecond = value == null ? null : Math.round(value * 1024 * 1024) },
 })
 
-function setSection(section: Section): void {
+function setSection(section: SettingsSection): void {
   activeSection.value = section
-  void router.replace({ query: section === 'auth' ? {} : { section } })
+  const query = { ...route.query }
+  if (section === 'auth') delete query.section
+  else query.section = section
+  void router.replace({ query })
+}
+
+function handleSectionChange(section: string): void {
+  if (isSettingsSection(section)) setSection(section)
 }
 
 async function changePassword(): Promise<void> {
@@ -187,7 +179,7 @@ async function saveSettings(): Promise<void> {
 }
 
 watch(() => route.query.section, (section) => {
-  if (typeof section === 'string' && sections.some((item) => item.value === section)) activeSection.value = section as Section
+  activeSection.value = isSettingsSection(section) ? section : 'auth'
 }, { immediate: true })
 
 onMounted(() => { void auth.load(); void loadSettings() })
@@ -199,11 +191,17 @@ onMounted(() => { void auth.load(); void loadSettings() })
       <template #actions><el-button :icon="Monitor" @click="$router.push('/diagnostics')">关于与诊断</el-button></template>
     </PageHeader>
 
-    <div class="settings-layout">
-      <nav class="settings-nav surface-card" aria-label="设置分组">
-        <button v-for="section in sections" :key="section.value" type="button" :class="{ active: activeSection === section.value }" @click="setSection(section.value)"><el-icon><component :is="section.icon" /></el-icon><span><strong>{{ section.label }}</strong><small>{{ section.description }}</small></span></button>
-      </nav>
+    <div class="settings-section-switcher surface-card">
+      <div>
+        <span>设置分组</span>
+        <small>{{ settingsSections.find((section) => section.value === activeSection)?.description }}</small>
+      </div>
+      <el-select :model-value="activeSection" data-testid="settings-section-select" aria-label="设置分组" @change="handleSectionChange">
+        <el-option v-for="section in settingsSections" :key="section.value" :label="section.label" :value="section.value" />
+      </el-select>
+    </div>
 
+    <div class="settings-layout">
       <main class="settings-panel surface-card">
         <section v-if="activeSection === 'account'" class="settings-section">
           <div class="section-head"><div><h2>本机管理员</h2><p>该账号用于保护 Bili Insight 页面、任务、产物和 Cookie 设置，与 Bilibili 登录态相互独立。</p></div><el-tag type="success" effect="plain">{{ appAuth.status?.username }}</el-tag></div>
@@ -314,14 +312,14 @@ onMounted(() => { void auth.load(); void loadSettings() })
 </template>
 
 <style scoped>
-.settings-view { width: 100%; }.settings-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); align-items: start; gap: 14px; }.settings-nav { display: grid; gap: 3px; padding: 7px; }.settings-nav button { display: flex; align-items: center; gap: 11px; min-height: 52px; padding: 8px 10px; border: 0; border-radius: 11px; background: transparent; color: var(--text-secondary); text-align: left; cursor: pointer; }.settings-nav button.active { background: var(--brand-soft); color: var(--brand); }.settings-nav .el-icon { flex: 0 0 auto; font-size: 19px; }.settings-nav strong, .settings-nav small { display: block; }.settings-nav strong { font-size: 12px; }.settings-nav small { margin-top: 2px; color: var(--text-tertiary); font-size: 10px; }
+.settings-view { width: 100%; }.settings-layout { width: 100%; }.settings-section-switcher { display: none; }
 .settings-panel { min-width: 0; overflow: clip; }.settings-section { padding: 22px; }.section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 17px; padding-bottom: 15px; border-bottom: 1px solid var(--line-soft); }.section-head h2 { margin: 0; font-size: 20px; }.section-head p { max-width: 720px; margin: 5px 0 0; color: var(--text-secondary); line-height: 1.55; }
 .account-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; margin-bottom: 17px; padding: 16px; border: 1px solid #a9ddca; border-radius: 14px; background: #effaf5; }.account-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #d4f1e4; color: var(--success); }.account-icon svg { width: 19px; }.account-card small, .account-card strong, .account-card p { display: block; margin: 0; }.account-card > div > small { color: #4f8c76; font-size: 10px; }.account-card > div > strong { margin-top: 4px; }.account-card p { margin-top: 4px; color: #4f7869; font-size: 11px; }.account-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 0; }.account-card dt { color: #62927f; font-size: 9px; }.account-card dd { margin: 4px 0 0; color: #386c59; font-size: 10px; }
 .auth-warning, .privacy-alert { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 14px; padding: 13px; border-radius: 12px; }.auth-warning { background: #fff2e8; color: #99521d; }.privacy-alert { background: var(--brand-soft); color: var(--brand); }.auth-warning p, .privacy-alert p { margin: 4px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
 .upload-area { display: grid; place-items: center; min-height: 210px; padding: 25px; border: 1.5px dashed var(--line); border-radius: 15px; background: var(--surface-muted); text-align: center; transition: .16s; }.upload-area.dragging { border-color: var(--brand); background: var(--brand-soft); }.upload-area.selected { border-style: solid; }.upload-area > .el-icon { margin-bottom: 10px; color: var(--brand); font-size: 42px; }.upload-area strong { overflow-wrap: anywhere; }.upload-area p { margin: 7px 0 14px; color: var(--text-tertiary); font-size: 11px; }.upload-error { margin: 9px 0 0; color: var(--danger); }
 .auth-workspace { display: grid; gap: 14px; }.remember-row, .switch-field { display: flex; align-items: center; justify-content: space-between; gap: 22px; }.remember-row { padding: 13px; border: 1px solid var(--line-soft); border-radius: 12px; }.remember-row strong, .remember-row small, .switch-field strong, .switch-field small { display: block; }.remember-row strong, .switch-field strong { font-size: 12px; }.remember-row small, .switch-field small { margin-top: 4px; color: var(--text-tertiary); font-size: 10px; line-height: 1.5; }.auth-actions { display: flex; flex-wrap: wrap; gap: 8px; }.auth-actions .el-button { margin-left: 0; }
 .settings-loading { padding: 30px; }.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }.form-grid > label { display: grid; align-content: start; gap: 7px; min-width: 0; }.form-grid > label > span { color: var(--text-secondary); font-size: 11px; font-weight: 650; }.form-grid > label > small { color: var(--text-tertiary); font-size: 10px; }.form-grid .wide { grid-column: 1 / -1; }.form-grid :deep(.el-input-number) { width: 100%; }.form-grid .switch-field { display: flex; min-height: 60px; padding: 11px; border: 1px solid var(--line-soft); border-radius: 11px; }.account-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
-.save-error { margin: 0 28px 15px; }.save-bar { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 14px 28px; border-top: 1px solid var(--line-soft); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(14px); }.save-bar span { margin-right: auto; color: var(--text-tertiary); font-size: 11px; }
+.save-error { margin: 0 28px 15px; }.save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 14px 28px; border-top: 1px solid var(--line-soft); background: color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter: blur(14px); }.save-bar span { margin-right: auto; color: var(--text-tertiary); font-size: 11px; }
 @media (min-width: 1200px) {
   .auth-workspace { grid-template-columns: minmax(250px, .8fr) minmax(350px, 1.2fr); grid-template-rows: auto auto 1fr; column-gap: 18px; }
   .auth-workspace .privacy-alert { grid-column: 1; grid-row: 1; margin: 0; }
@@ -330,9 +328,15 @@ onMounted(() => { void auth.load(); void loadSettings() })
   .auth-workspace .auth-actions { grid-column: 1; grid-row: 3; align-self: end; }
   .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@media (max-width: 900px) { .settings-layout { grid-template-columns: 190px 1fr; }.account-card { grid-template-columns: auto 1fr; }.account-card dl { grid-column: 2; } }
+@media (max-width: 1199px) {
+  .settings-section-switcher { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; padding: 10px 12px; }
+  .settings-section-switcher > div { min-width: 0; }.settings-section-switcher span, .settings-section-switcher small { display: block; }.settings-section-switcher span { font-size: 12px; font-weight: 750; }.settings-section-switcher small { margin-top: 2px; overflow: hidden; color: var(--text-tertiary); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+  .settings-section-switcher :deep(.el-select) { width: min(220px, 48%); }
+  .settings-section-switcher :deep(.el-select__wrapper) { min-height: 44px; }
+}
+@media (max-width: 900px) { .account-card { grid-template-columns: auto 1fr; }.account-card dl { grid-column: 2; } }
 @media (max-width: 767px) {
-  .settings-layout { grid-template-columns: 1fr; }.settings-nav { display: flex; max-width: 100%; margin-inline: 0; padding: 8px; overflow-x: auto; border: 0; border-radius: 0; background: transparent; box-shadow: none; scrollbar-width: none; }.settings-nav button { flex: 0 0 auto; min-height: 48px; padding: 8px 12px; border: 1px solid var(--line); background: var(--surface); }.settings-nav button.active { border-color: var(--brand); }.settings-nav button small { display: none; }
+  .settings-section-switcher { position: sticky; top: 66px; z-index: 12; }.settings-section-switcher > div small { display: none; }.settings-section-switcher :deep(.el-select) { width: 54%; }
   .settings-panel { border-radius: 16px; }.section-head { display: block; }.section-head :deep(.auth-badge) { margin-top: 12px; }.account-card { grid-template-columns: auto 1fr; padding: 13px; }.account-card dl { grid-column: 1 / -1; }.form-grid { grid-template-columns: 1fr; }.form-grid .wide { grid-column: auto; }.auth-actions { display: grid; grid-template-columns: 1fr; }.auth-actions .el-button { min-height: 46px; margin: 0; }.save-bar { bottom: 68px; padding: 12px 16px; }.save-bar span { display: none; }.save-bar .el-button { width: 100%; min-height: 46px; }
 }
 </style>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Compass,
   Clock,
+  ArrowDown,
   DocumentChecked,
   Expand,
   Files,
@@ -16,6 +17,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import AuthStatusBadge from '@/components/AuthStatusBadge.vue'
+import { isSettingsSection, settingsSections, type SettingsSection } from '@/config/settingsSections'
 import { useAuthStore } from '@/stores/auth'
 import { useAppAuthStore } from '@/stores/appAuth'
 import { useJobsStore } from '@/stores/jobs'
@@ -26,19 +28,27 @@ const auth = useAuthStore()
 const appAuth = useAppAuthStore()
 const jobs = useJobsStore()
 const sidebarCollapsed = ref(window.localStorage.getItem('bili-insight:sidebar-collapsed') === 'true')
+const settingsExpanded = ref(
+  route.path.startsWith('/settings') || window.localStorage.getItem('bili-insight:settings-expanded') === 'true',
+)
 
 const navigation = [
   { path: '/', label: '解析', icon: Compass, testId: 'nav-home' },
   { path: '/recent', label: '最近', icon: Clock, testId: 'nav-recent' },
   { path: '/jobs', label: '任务', icon: DocumentChecked, badge: true, testId: 'nav-jobs' },
   { path: '/artifacts', label: '产物', icon: Files, testId: 'nav-artifacts' },
-  { path: '/settings', label: '设置', icon: Setting, testId: 'nav-settings' },
 ]
+const settingsNavigation = { path: '/settings', label: '设置', icon: Setting, testId: 'nav-settings' }
+const mobileNavigation = [...navigation, settingsNavigation]
 
 const activePath = computed(() => {
   if (route.path.startsWith('/videos/')) return '/'
+  if (route.path.startsWith('/settings')) return '/settings'
   return navigation.find((item) => route.path.startsWith(item.path) && item.path !== '/')?.path ?? '/'
 })
+const activeSettingsSection = computed<SettingsSection>(() => (
+  isSettingsSection(route.query.section) ? route.query.section : 'auth'
+))
 
 function navigate(path: string): void {
   if (route.path !== path) void router.push(path)
@@ -48,6 +58,28 @@ function toggleSidebar(): void {
   sidebarCollapsed.value = !sidebarCollapsed.value
   window.localStorage.setItem('bili-insight:sidebar-collapsed', String(sidebarCollapsed.value))
 }
+
+function toggleSettings(): void {
+  if (sidebarCollapsed.value) {
+    void router.push('/settings')
+    return
+  }
+  if (!route.path.startsWith('/settings')) {
+    settingsExpanded.value = true
+    void router.push('/settings')
+    return
+  }
+  settingsExpanded.value = !settingsExpanded.value
+}
+
+function navigateSettings(section: SettingsSection): void {
+  settingsExpanded.value = true
+  void router.push({ path: '/settings', query: section === 'auth' ? {} : { section } })
+}
+
+watch(settingsExpanded, (expanded) => {
+  window.localStorage.setItem('bili-insight:settings-expanded', String(expanded))
+})
 
 function handleVisibility(): void {
   if (document.visibilityState === 'visible') {
@@ -130,6 +162,35 @@ onBeforeUnmount(() => {
             <b v-if="item.badge && jobs.activeCount" class="nav-badge">{{ jobs.activeCount > 99 ? '99+' : jobs.activeCount }}</b>
           </button>
         </el-tooltip>
+        <div class="settings-nav-group" :class="{ open: settingsExpanded && !sidebarCollapsed }">
+          <el-tooltip :disabled="!sidebarCollapsed" content="设置" placement="right">
+            <button
+              type="button"
+              class="settings-parent"
+              data-testid="nav-settings-desktop"
+              :class="{ active: activePath === '/settings' }"
+              :aria-expanded="settingsExpanded && !sidebarCollapsed"
+              @click="toggleSettings"
+            >
+              <el-icon><Setting /></el-icon>
+              <span>设置</span>
+              <el-icon class="expand-indicator"><ArrowDown /></el-icon>
+            </button>
+          </el-tooltip>
+          <div v-show="settingsExpanded && !sidebarCollapsed" class="settings-subnav" data-testid="settings-subnav">
+            <button
+              v-for="section in settingsSections"
+              :key="section.value"
+              type="button"
+              :data-testid="`settings-section-${section.value}-desktop`"
+              :class="{ active: activePath === '/settings' && activeSettingsSection === section.value }"
+              @click="navigateSettings(section.value)"
+            >
+              <span>{{ section.label }}</span>
+              <small>{{ section.description }}</small>
+            </button>
+          </div>
+        </div>
       </nav>
 
       <div class="sidebar-spacer" />
@@ -164,7 +225,7 @@ onBeforeUnmount(() => {
 
     <nav class="mobile-nav" aria-label="移动端主导航">
       <button
-        v-for="item in navigation"
+        v-for="item in mobileNavigation"
         :key="item.path"
           type="button"
           :data-testid="`${item.testId}-mobile`"
@@ -212,6 +273,15 @@ onBeforeUnmount(() => {
 .desktop-nav button:hover, .diagnostics-link:hover { background: var(--surface-muted); color: var(--text-primary); }
 .desktop-nav button.active { background: var(--brand-soft); color: var(--brand); }
 .desktop-nav .el-icon, .diagnostics-link .el-icon { font-size: 20px; }
+.settings-nav-group { display: grid; gap: 3px; }
+.settings-parent .expand-indicator { margin-left: auto; font-size: 14px; transition: transform .18s ease; }
+.settings-nav-group.open .expand-indicator { transform: rotate(180deg); }
+.settings-subnav { position: relative; display: grid; gap: 1px; padding: 2px 0 4px 41px; }
+.settings-subnav::before { position: absolute; inset: 4px auto 8px 24px; width: 1px; background: var(--line); content: ''; }
+.desktop-nav .settings-subnav button { display: grid; align-content: center; gap: 1px; min-height: 35px; padding: 5px 9px; border-radius: 8px; font-weight: 650; }
+.settings-subnav button span { font-size: 11px; }
+.settings-subnav button small { overflow: hidden; color: var(--text-tertiary); font-size: 9px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.settings-subnav button.active small { color: color-mix(in srgb, var(--brand) 68%, var(--text-tertiary)); }
 .nav-badge { margin-left: auto; min-width: 22px; padding: 2px 6px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 11px; text-align: center; }
 .sidebar-spacer { flex: 1; }
 .admin-session { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; margin-bottom: 9px; padding: 10px 11px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
@@ -224,6 +294,8 @@ onBeforeUnmount(() => {
 .sidebar.is-collapsed .brand { justify-content: center; padding-inline: 0; }
 .sidebar.is-collapsed .brand-copy,
 .sidebar.is-collapsed .desktop-nav button > span,
+.sidebar.is-collapsed .settings-subnav,
+.sidebar.is-collapsed .settings-parent .expand-indicator,
 .sidebar.is-collapsed .diagnostics-link span,
 .sidebar.is-collapsed .auth-card small,
 .sidebar.is-collapsed .auth-card :deep(.auth-badge span),
@@ -250,7 +322,7 @@ onBeforeUnmount(() => {
   .sidebar-toggle { display: none; }
   .sidebar { width: 84px; padding-inline: 12px; }
   .brand { justify-content: center; padding-inline: 0; }
-  .brand-copy, .desktop-nav button > span, .diagnostics-link span, .auth-card small, .auth-card :deep(.auth-badge span), .admin-session span { display: none; }
+  .brand-copy, .desktop-nav button > span, .settings-subnav, .settings-parent .expand-indicator, .diagnostics-link span, .auth-card small, .auth-card :deep(.auth-badge span), .admin-session span { display: none; }
   .admin-session { display: flex; justify-content: center; padding-inline: 0; }.admin-session > .el-icon { display: none; }
   .desktop-nav button, .diagnostics-link { justify-content: center; padding: 0; }
   .nav-badge { position: absolute; margin: -27px 0 0 27px; }

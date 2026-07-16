@@ -81,12 +81,15 @@ function selectMode(mode: AccessMode): void {
   <div class="home-view">
     <section class="workbench">
       <header class="hero-copy">
+        <div class="hero-signal hero-signal-left" aria-hidden="true"><i v-for="index in 7" :key="index" /></div>
+        <div class="hero-signal hero-signal-right" aria-hidden="true"><i v-for="index in 7" :key="index" /></div>
         <p class="eyebrow">LOCAL MEDIA WORKBENCH</p>
         <h1>从一个链接开始，<br><span>看清视频的每一层。</span></h1>
         <p class="lead">解析实际可访问的音视频规格，按需下载、合并并生成可追踪的内容与媒体分析。</p>
       </header>
 
       <div class="parse-panel surface-card">
+        <div class="panel-trace" aria-hidden="true"><i /><i /><i /><span /></div>
         <div class="panel-heading">
           <div>
             <span class="step-label">新建解析</span>
@@ -172,11 +175,18 @@ function selectMode(mode: AccessMode): void {
   gap: 22px;
 }
 .eyebrow, .step-label { color: var(--brand); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.hero-copy { text-align: center; }
+.hero-copy { position: relative; text-align: center; }
+.hero-signal { position: absolute; top: 30px; display: flex; align-items: center; gap: 5px; width: 150px; height: 42px; padding-inline: 12px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); opacity: .72; }
+.hero-signal::after { flex: 1; height: 1px; background: var(--line); content: ''; }
+.hero-signal i { width: 2px; border-radius: 2px; background: var(--brand); }
+.hero-signal i:nth-child(1), .hero-signal i:nth-child(7) { height: 6px; }.hero-signal i:nth-child(2), .hero-signal i:nth-child(6) { height: 13px; }.hero-signal i:nth-child(3), .hero-signal i:nth-child(5) { height: 21px; }.hero-signal i:nth-child(4) { height: 30px; background: var(--accent); }
+.hero-signal-left { left: 18px; }.hero-signal-right { right: 18px; transform: scaleX(-1); }
 .hero-copy h1 { margin: 10px 0 13px; font-size: 52px; line-height: 1.06; letter-spacing: 0; }
 .hero-copy h1 span { color: var(--brand); }
 .lead { max-width: 720px; margin: 0 auto; color: var(--text-secondary); font-size: 15px; line-height: 1.6; }
-.parse-panel { padding: 22px; border-radius: 14px; }
+.parse-panel { position: relative; padding: 22px; border-radius: 14px; }
+.panel-trace { position: absolute; top: -1px; left: 22px; display: flex; align-items: center; gap: 5px; width: 108px; height: 1px; }
+.panel-trace i { width: 5px; height: 5px; border: 1px solid var(--surface); border-radius: 50%; background: var(--brand); }.panel-trace i:nth-child(2) { background: var(--accent); }.panel-trace span { flex: 1; height: 1px; background: var(--brand); }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .panel-heading h2 { margin: 5px 0 0; font-size: 18px; }
 .input-row { display: flex; gap: 8px; }
@@ -211,6 +221,7 @@ function selectMode(mode: AccessMode): void {
   .hero-copy h1 { font-size: 44px; }
   .parse-panel { padding: 19px; }
   .mode-options button { min-height: 68px; }
+  .hero-signal { display: none; }
 }
 
 @media (max-width: 767px) {
@@ -219,6 +230,7 @@ function selectMode(mode: AccessMode): void {
   .hero-copy h1 { margin: 7px 0 8px; font-size: 32px; line-height: 1.08; }
   .lead { font-size: 12px; line-height: 1.45; }
   .parse-panel { padding: 15px; border-radius: 14px; }
+  .panel-trace { left: 15px; }
   .panel-heading { margin-bottom: 12px; }
   .panel-heading h2 { font-size: 16px; }
   .panel-heading :deep(.auth-badge) { font-size: 10px; }
