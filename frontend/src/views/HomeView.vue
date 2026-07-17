@@ -61,7 +61,7 @@ async function parseVideo(): Promise<void> {
     const video = await videos.parse(normalized.url, accessMode.value)
     await router.push({ name: 'video-detail', params: { videoId: video.id } })
   } catch {
-    // Store exposes a safe, actionable error below the control deck.
+    // Store exposes a safe, actionable error below the form.
   }
 }
 
@@ -73,32 +73,36 @@ function selectMode(mode: AccessMode): void {
 
 <template>
   <div class="home-view">
-    <section class="xray-home">
-      <MediaDecompositionStage :video="previewVideo" :parsing="videos.loading" :source-ready="sourceReady" />
+    <section class="landing-page">
+      <div class="hero-showcase">
+        <header class="hero-copy">
+          <div class="hero-meta">
+            <span class="brand-signature"><b>BI / 01</b><i aria-hidden="true" /><strong>BILI INSIGHT</strong></span>
+            <AuthStatusBadge :status="auth.status" :loading="auth.loading" />
+          </div>
+          <span class="hero-kicker">VIDEO INTELLIGENCE WORKSPACE</span>
+          <h1>把视频拆开看。</h1>
+          <p>画面、声音、字幕和元数据，不再藏在一个播放按钮后面。</p>
+          <div class="hero-capabilities" aria-label="产品能力">
+            <span>真实规格</span><span>在线预览</span><span>AI 分析</span><span>可追踪产物</span>
+          </div>
+        </header>
 
-      <div class="home-status">
-        <div class="brand-signature"><span>BI / 01</span><i aria-hidden="true" /><strong>BILI INSIGHT</strong><small>VIDEO X-RAY</small></div>
-        <AuthStatusBadge :status="auth.status" :loading="auth.loading" />
+        <div class="visual-stage">
+          <MediaDecompositionStage :video="previewVideo" :parsing="videos.loading" :source-ready="sourceReady" />
+        </div>
       </div>
 
-      <header class="hero-copy">
-        <span class="hero-kicker">MEDIA INTELLIGENCE WORKSPACE</span>
-        <h1>让视频，<strong>显出结构。</strong></h1>
-        <p>画面、声音、字幕与元数据，在这里成为一张可操作的媒体图谱。</p>
-      </header>
-
-      <div class="parse-panel control-deck">
-        <div class="deck-heading">
-          <span><b>01</b> INPUT SOURCE</span>
-          <div v-if="auth.isAuthenticated && accessMode !== 'authenticated'" class="auth-explanation">
-            <el-icon><Lock /></el-icon><span>智能模式优先匿名访问</span>
-          </div>
+      <div class="parse-panel surface-card">
+        <div class="panel-heading">
+          <div><span>01 / PARSE</span><strong>开始一次解析</strong></div>
+          <div v-if="auth.isAuthenticated && accessMode !== 'authenticated'" class="auth-explanation"><el-icon><Lock /></el-icon><span>智能模式优先匿名访问</span></div>
         </div>
 
         <form novalidate @submit.prevent="parseVideo">
           <h2 class="sr-only">粘贴 Bilibili 视频链接</h2>
           <label class="sr-only" for="video-url">Bilibili 视频链接、BV/AV 号或 ss/ep 标识</label>
-          <div class="deck-controls">
+          <div class="parse-controls">
             <div class="source-input" :class="{ invalid: validationMessage, ready: sourceReady }">
               <span class="source-icon"><el-icon><Film /></el-icon></span>
               <el-input
@@ -129,93 +133,77 @@ function selectMode(mode: AccessMode): void {
                 :title="mode.description"
                 @click="selectMode(mode.value)"
               >
-                <span class="mode-node" aria-hidden="true" />
-                <span><strong>{{ mode.title }}</strong><small>{{ mode.description }}</small></span>
+                <span class="mode-node" aria-hidden="true" /><strong>{{ mode.title }}</strong>
               </button>
             </fieldset>
 
             <el-button class="parse-button" native-type="submit" type="primary" size="large" :loading="videos.loading" data-testid="parse-submit">
-              <span>{{ videos.loading ? '正在展开结构' : '开始 X-Ray 解析' }}</span>
-              <el-icon v-if="!videos.loading"><ArrowRight /></el-icon>
+              <span>{{ videos.loading ? '正在展开结构' : '开始解析' }}</span><el-icon v-if="!videos.loading"><ArrowRight /></el-icon>
             </el-button>
           </div>
-
           <p v-if="validationMessage" class="validation" role="alert"><el-icon><CircleClose /></el-icon>{{ validationMessage }}</p>
         </form>
         <RequestError v-if="videos.error" class="parse-error" :error="videos.error" @retry="parseVideo" />
       </div>
 
       <footer class="workflow-copy">
-        <span>SOURCE</span><i /><span>STREAMS</span><i /><span>INTELLIGENCE</span><i /><span>OUTPUT</span>
-        <small>预览、分析和下载都从同一张媒体图谱继续。</small>
+        <span>解析视频源</span><i /><span>选择实际规格</span><i /><span>预览或创建任务</span>
+        <small>所有耗时操作、失败原因和产物都进入可追踪工作流。</small>
       </footer>
     </section>
   </div>
 </template>
 
 <style scoped>
-.home-view { width: 100%; height: 100%; min-height: 100dvh; overflow: hidden; background: #091113; }
-.xray-home { position: relative; width: 100%; height: 100dvh; min-height: 700px; overflow: hidden; background: #091113; color: #edf7f5; }
-.xray-home::before { position: absolute; top: 0; bottom: 0; left: 3.8%; width: 3px; background: var(--accent); content: ''; opacity: .85; }
-.home-status { position: absolute; top: 38px; right: 4.5%; left: 4.5%; z-index: 10; display: flex; align-items: center; justify-content: space-between; }
-.brand-signature { display: flex; align-items: center; gap: 10px; color: #d6e6e3; font-family: "SFMono-Regular", Consolas, monospace; font-size: 9px; }
-.brand-signature > span { color: var(--accent); }.brand-signature i { width: 34px; height: 1px; background: rgba(221, 240, 237, .22); }.brand-signature strong { font-size: 9px; }.brand-signature small { color: #718986; font-size: 8px; }
-.hero-copy { position: absolute; top: 13%; left: 4.5%; z-index: 8; width: min(42%, 520px); }
-.hero-kicker { color: #6f8784; font-family: "SFMono-Regular", Consolas, monospace; font-size: 8px; }
-.hero-copy h1 { margin: 17px 0 16px; color: #f5fbfa; font-size: 66px; font-weight: 780; line-height: .95; letter-spacing: 0; }
-.hero-copy h1 strong { display: block; color: var(--brand); font-weight: inherit; }
-.hero-copy p { max-width: 430px; margin: 0; color: #9bb0ad; font-size: 14px; line-height: 1.7; }
-.control-deck { position: absolute; right: 4.5%; bottom: 70px; left: 4.5%; z-index: 12; min-height: 116px; padding: 13px 15px 15px; border: 1px solid rgba(219, 237, 234, .18); border-top: 2px solid var(--brand); border-radius: 6px; background: #f5f7f6; color: #172120; box-shadow: 0 22px 55px rgba(0, 0, 0, .26); }
-.deck-heading { display: flex; align-items: center; justify-content: space-between; min-height: 21px; margin-bottom: 8px; color: #657371; font-family: "SFMono-Regular", Consolas, monospace; font-size: 8px; }
-.deck-heading b { margin-right: 7px; color: var(--brand); }.auth-explanation { display: flex; align-items: center; gap: 5px; color: #75817f; }
-.deck-controls { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(290px, .65fr) minmax(180px, .34fr); gap: 9px; }
-.source-input { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; min-width: 0; height: 52px; overflow: hidden; border: 1px solid #d7dfdd; border-radius: 5px; background: white; transition: border-color .18s, box-shadow .18s; }
-.source-input:focus-within, .source-input.ready { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(12, 127, 121, .1); }.source-input.invalid { border-color: var(--danger); }
-.source-icon { display: grid; place-items: center; height: 28px; border-right: 1px solid #e5ebe9; color: var(--brand); font-size: 17px; }
-.source-input :deep(.el-input__wrapper) { min-height: 50px; padding-inline: 12px; background: transparent; box-shadow: none; }.source-input :deep(.el-input__inner) { font-size: 12px; }
-.paste-button { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 5px; background: #eef2f1; color: #677573; cursor: pointer; }.paste-button:hover { background: var(--brand-soft); color: var(--brand); }
-.mode-fieldset { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); min-width: 0; padding: 3px; margin: 0; border: 1px solid #d7dfdd; border-radius: 5px; background: #e9eeed; }
-.mode-fieldset button { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 44px; padding: 4px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: #53615f; cursor: pointer; }
-.mode-fieldset button.selected { border-color: #d5dddb; background: white; color: #14201e; box-shadow: 0 4px 12px rgba(25, 41, 39, .06); }.mode-fieldset button.disabled:not(.selected) { opacity: .48; }
-.mode-node { flex: 0 0 auto; width: 6px; height: 6px; border: 1px solid #8b9997; border-radius: 50%; }.selected .mode-node { border-color: var(--brand); background: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
-.mode-fieldset strong, .mode-fieldset small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.mode-fieldset strong { font-size: 10px; }.mode-fieldset small { display: none; }
-.parse-button { width: 100%; height: 52px; min-height: 52px; margin: 0; border-radius: 5px; }.parse-button :deep(span) { display: flex; align-items: center; justify-content: center; gap: 9px; }
+.home-view { display: grid; width: 100%; min-height: calc(100dvh - 72px); align-items: center; }
+.landing-page { display: grid; width: 100%; gap: 14px; }
+.hero-showcase { display: grid; grid-template-columns: minmax(390px, .8fr) minmax(500px, 1.2fr); gap: clamp(24px, 3vw, 48px); align-items: center; min-height: 430px; }
+.hero-copy { min-width: 0; }
+.hero-meta { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 24px; }
+.brand-signature { display: flex; align-items: center; gap: 9px; color: var(--brand); font-family: "SFMono-Regular", Consolas, monospace; font-size: 8px; }.brand-signature b { color: var(--accent); }.brand-signature i { width: 32px; height: 1px; background: var(--line); }.brand-signature strong { font-size: 8px; }
+.hero-kicker { color: var(--text-tertiary); font-family: "SFMono-Regular", Consolas, monospace; font-size: 8px; }
+.hero-copy h1 { margin: 14px 0 14px; font-size: 58px; line-height: 1.02; letter-spacing: 0; }
+.hero-copy p { max-width: 470px; margin: 0; color: var(--text-secondary); font-size: 15px; line-height: 1.7; }
+.hero-capabilities { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 24px; }.hero-capabilities span { padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text-secondary); font-size: 9px; }
+.visual-stage { min-width: 0; height: 430px; }
+.parse-panel { padding: 14px; border-radius: 8px; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }.panel-heading > div:first-child { display: flex; align-items: center; gap: 10px; }.panel-heading span { color: var(--text-tertiary); font-family: "SFMono-Regular", Consolas, monospace; font-size: 8px; }.panel-heading strong { font-size: 12px; }.auth-explanation { display: flex; align-items: center; gap: 5px; color: var(--text-tertiary); font-size: 9px; }
+.parse-controls { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(260px, .62fr) minmax(160px, .28fr); gap: 8px; }
+.source-input { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; min-width: 0; height: 50px; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); transition: border-color .18s, box-shadow .18s; }.source-input:focus-within, .source-input.ready { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(12, 127, 121, .09); }.source-input.invalid { border-color: var(--danger); }
+.source-icon { display: grid; place-items: center; height: 28px; border-right: 1px solid var(--line-soft); color: var(--brand); font-size: 17px; }.source-input :deep(.el-input__wrapper) { min-height: 48px; padding-inline: 12px; background: transparent; box-shadow: none; }.source-input :deep(.el-input__inner) { font-size: 12px; }
+.paste-button { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 5px; background: var(--surface-muted); color: var(--text-secondary); cursor: pointer; }.paste-button:hover { background: var(--brand-soft); color: var(--brand); }
+.mode-fieldset { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); min-width: 0; padding: 3px; margin: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-muted); }.mode-fieldset button { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 44px; padding: 4px 5px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text-secondary); cursor: pointer; }.mode-fieldset button.selected { border-color: var(--line); background: var(--surface); color: var(--text-primary); box-shadow: 0 3px 9px rgba(31, 36, 51, .05); }.mode-fieldset button.disabled:not(.selected) { opacity: .5; }
+.mode-node { width: 6px; height: 6px; border: 1px solid var(--text-tertiary); border-radius: 50%; }.selected .mode-node { border-color: var(--brand); background: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }.mode-fieldset strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.parse-button { width: 100%; height: 50px; min-height: 50px; margin: 0; border-radius: 6px; }.parse-button :deep(span) { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .validation { display: flex; align-items: center; gap: 6px; margin: 7px 0 0; color: var(--danger); font-size: 10px; }.parse-error { margin-top: 9px; }
-.workflow-copy { position: absolute; right: 4.5%; bottom: 24px; left: 4.5%; z-index: 11; display: flex; align-items: center; gap: 10px; color: #667e7b; font-family: "SFMono-Regular", Consolas, monospace; font-size: 7px; }
-.workflow-copy > i { width: 24px; height: 1px; background: rgba(206, 231, 227, .14); }.workflow-copy > span:first-child { color: var(--scene-signal, #39dfc9); }.workflow-copy small { margin-left: auto; color: #718986; font-family: Inter, "PingFang SC", sans-serif; font-size: 9px; }
+.workflow-copy { display: flex; align-items: center; gap: 9px; min-height: 28px; padding-inline: 3px; color: var(--text-tertiary); font-size: 9px; }.workflow-copy > i { width: 20px; height: 1px; background: var(--line); }.workflow-copy > span:first-child { color: var(--brand); }.workflow-copy small { margin-left: auto; color: var(--text-tertiary); font-size: 9px; }
 
 @media (max-width: 1365px) {
-  .hero-copy h1 { font-size: 56px; }
-  .deck-controls { grid-template-columns: minmax(270px, 1fr) minmax(260px, .65fr) 180px; }
+  .home-view { min-height: calc(100dvh - 60px); }
+  .hero-showcase { grid-template-columns: minmax(350px, .75fr) minmax(440px, 1.25fr); min-height: 400px; }
+  .hero-copy h1 { font-size: 50px; }.visual-stage { height: 400px; }
 }
 
-@media (min-width: 768px) and (max-width: 1199px) {
-  .xray-home { min-height: 760px; }
-  .hero-copy { top: 8%; width: 70%; }.hero-copy h1 { font-size: 54px; }.hero-copy p { max-width: 520px; }
-  .deck-controls { grid-template-columns: minmax(260px, 1fr) minmax(260px, .8fr); }
-  .parse-button { grid-column: 1 / -1; }
-  .control-deck { min-height: 168px; }
+@media (min-width: 768px) and (max-width: 1040px) {
+  .hero-showcase { grid-template-columns: 1fr; gap: 13px; min-height: 0; }.hero-meta { margin-bottom: 12px; }.hero-copy h1 { margin-block: 8px; font-size: 42px; }.hero-copy p { font-size: 12px; }.hero-capabilities { margin-top: 12px; }.visual-stage { height: 300px; }
+  .parse-controls { grid-template-columns: minmax(260px, 1fr) minmax(250px, .8fr); }.parse-button { grid-column: 1 / -1; }
 }
 
 @media (max-width: 767px) {
-  .home-view { min-height: calc(100dvh - 64px); }
-  .xray-home { height: calc(100dvh - 64px); min-height: 680px; }
-  .xray-home::before { left: 0; width: 2px; }
-  .home-status { display: none; }
-  .hero-copy { top: 24px; left: 16px; width: calc(100% - 32px); }.hero-kicker { font-size: 6px; }.hero-copy h1 { margin: 8px 0 7px; font-size: 34px; line-height: .98; }.hero-copy p { max-width: 330px; font-size: 10px; line-height: 1.5; }
-  .control-deck { right: 12px; bottom: 79px; left: 12px; min-height: 174px; padding: 9px; border-radius: 5px; }
-  .deck-heading { margin-bottom: 6px; }.auth-explanation { display: none; }
-  .deck-controls { grid-template-columns: 1fr; gap: 6px; }
-  .source-input { grid-template-columns: 38px minmax(0, 1fr) 42px; height: 44px; }.source-input :deep(.el-input__wrapper) { min-height: 42px; padding-inline: 8px; }.source-input :deep(.el-input__inner) { font-size: 10px; }.source-icon { height: 24px; font-size: 14px; }.paste-button { width: 34px; height: 34px; }
-  .mode-fieldset { gap: 3px; }.mode-fieldset button { min-height: 44px; }.mode-fieldset strong { font-size: 10px; }.mode-node { display: none; }
+  .home-view { min-height: calc(100dvh - 174px); }
+  .landing-page { gap: 7px; }
+  .hero-showcase { grid-template-columns: 1fr; gap: 6px; min-height: 0; }
+  .hero-meta { margin-bottom: 5px; }.hero-meta :deep(.auth-badge) { display: none; }.brand-signature { font-size: 6px; }.brand-signature i { width: 20px; }.brand-signature strong { font-size: 6px; }
+  .hero-kicker { display: none; }.hero-copy h1 { margin: 0 0 4px; font-size: 31px; }.hero-copy p { max-width: 340px; font-size: 10px; line-height: 1.45; }.hero-capabilities { display: none; }
+  .visual-stage { height: 210px; }
+  .parse-panel { padding: 8px; }.panel-heading { min-height: 20px; margin-bottom: 5px; }.panel-heading > div:first-child { gap: 7px; }.panel-heading strong { font-size: 10px; }.auth-explanation { display: none; }
+  .parse-controls { grid-template-columns: 1fr; gap: 5px; }.source-input { grid-template-columns: 38px minmax(0, 1fr) 42px; height: 44px; }.source-input :deep(.el-input__wrapper) { min-height: 42px; padding-inline: 8px; }.source-input :deep(.el-input__inner) { font-size: 10px; }.source-icon { height: 24px; font-size: 14px; }.paste-button { width: 34px; height: 34px; }
+  .mode-fieldset { gap: 3px; }.mode-fieldset button { min-height: 44px; }.mode-node { display: none; }.mode-fieldset strong { font-size: 10px; }
   .parse-button { height: 46px; min-height: 46px; }
-  .validation { position: absolute; right: 9px; bottom: -20px; left: 9px; }
-  .workflow-copy { display: none; }
+  .validation { position: absolute; right: 8px; bottom: -19px; left: 8px; }.workflow-copy { justify-content: center; min-height: 22px; font-size: 7px; }.workflow-copy small { display: none; }.workflow-copy > i { width: 12px; }
 }
 
 @media (max-width: 374px) {
-  .hero-copy h1 { font-size: 31px; }
-  .hero-copy p { font-size: 9px; }
-  .control-deck { bottom: 74px; }
+  .hero-copy h1 { font-size: 28px; }.visual-stage { height: 198px; }
 }
 </style>
