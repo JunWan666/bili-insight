@@ -8,7 +8,6 @@ import {
   Clock,
   DocumentCopy,
   Film,
-  Lock,
   User,
 } from '@element-plus/icons-vue'
 import AuthStatusBadge from '@/components/AuthStatusBadge.vue'
@@ -104,14 +103,9 @@ function selectMode(mode: AccessMode): void {
   <div class="home-view">
     <section class="landing-page">
       <header class="hero-intro">
-        <div class="hero-meta">
-          <span class="brand-signature"><b>BILI INSIGHT</b><i aria-hidden="true" /><strong>LOCAL MEDIA WORKBENCH</strong></span>
-          <AuthStatusBadge :status="auth.status" :loading="auth.loading" />
-        </div>
-
-        <h1><span>视频，</span><strong>别只看表面。</strong></h1>
+        <h1><span>从一条链接开始，</span><strong>看清视频的每一层。</strong></h1>
         <p class="hero-description">
-          把一条链接展开成<span class="layer-word layer-picture">画面</span>、<span class="layer-word layer-sound">声音</span>、<span class="layer-word layer-caption">字幕</span>与<span class="layer-word layer-data">数据</span>。先看清，再播放，最后决定要不要下载。
+          <span class="layer-word layer-picture">画面</span>、<span class="layer-word layer-sound">声音</span>、<span class="layer-word layer-caption">字幕</span>、<span class="layer-word layer-data">规格</span>与内容线索，逐层展开。先播放，再决定是否下载。
         </p>
       </header>
 
@@ -121,8 +115,9 @@ function selectMode(mode: AccessMode): void {
             <span>START HERE</span>
             <h2 id="parse-heading">把视频链接放进来</h2>
           </div>
-          <div v-if="auth.isAuthenticated && accessMode !== 'authenticated'" class="auth-explanation">
-            <el-icon><Lock /></el-icon><span>已保存登录态，智能模式仍优先匿名</span>
+          <div class="auth-context">
+            <span>当前账号</span>
+            <AuthStatusBadge :status="auth.status" :loading="auth.loading" compact />
           </div>
         </div>
 
@@ -212,18 +207,16 @@ function selectMode(mode: AccessMode): void {
 .home-view { display: grid; width: 100%; min-height: calc(100dvh - 72px); align-items: center; }
 .landing-page { display: grid; width: 100%; gap: 18px; }
 .hero-intro { display: grid; justify-items: center; text-align: center; }
-.hero-meta { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 22px; }
-.brand-signature { display: flex; align-items: center; gap: 10px; color: var(--text-tertiary); font-family: "SFMono-Regular", Consolas, monospace; font-size: 9px; }
-.brand-signature b { color: var(--brand); }.brand-signature i { width: 42px; height: 1px; background: var(--line); }.brand-signature strong { color: var(--accent); font-size: inherit; }
-.hero-intro h1 { margin: 0; font-size: 78px; font-weight: 850; line-height: 1.08; letter-spacing: 0; }
-.hero-intro h1 span { color: var(--text-primary); }.hero-intro h1 strong { color: var(--accent); font-weight: inherit; animation: headline-color 7s ease-in-out infinite; }
+.hero-intro h1 { margin: 0; font-size: 68px; font-weight: 850; line-height: 1.08; letter-spacing: 0; }
+.hero-intro h1 span { display: block; margin-bottom: 5px; color: var(--text-primary); font-size: .72em; font-weight: 760; }
+.hero-intro h1 strong { display: block; color: var(--accent); font-weight: inherit; animation: headline-color 7s ease-in-out infinite; }
 .hero-description { max-width: 760px; margin: 17px 0 0; color: var(--text-secondary); font-size: 16px; line-height: 1.8; }
 .layer-word { font-weight: 800; transition: color .2s ease; }.layer-picture, .layer-data { color: var(--brand); }.layer-sound, .layer-caption { color: var(--accent); }
 
 .parse-workbench { position: relative; width: min(1060px, 100%); margin-inline: auto; padding: 18px; border-color: color-mix(in srgb, var(--brand) 28%, var(--line-soft)); border-radius: 8px; box-shadow: 0 18px 48px rgba(31, 36, 51, .09); }
 .parse-workbench::before { position: absolute; top: -1px; left: 28px; width: 88px; height: 3px; background: var(--brand); content: ""; }
 .workbench-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 13px; }
-.workbench-heading > div:first-child { display: flex; align-items: baseline; gap: 10px; }.workbench-heading > div:first-child > span { color: var(--brand); font-family: "SFMono-Regular", Consolas, monospace; font-size: 8px; font-weight: 750; }.workbench-heading h2 { margin: 0; font-size: 14px; letter-spacing: 0; }.auth-explanation { display: flex; align-items: center; gap: 5px; color: var(--text-tertiary); font-size: 10px; }
+.workbench-heading > div:first-child { display: flex; align-items: baseline; gap: 10px; }.workbench-heading > div:first-child > span { color: var(--brand); font-family: "SFMono-Regular", Consolas, monospace; font-size: 8px; font-weight: 750; }.workbench-heading h2 { margin: 0; font-size: 14px; letter-spacing: 0; }.auth-context { display: flex; align-items: center; gap: 8px; color: var(--text-tertiary); font-size: 9px; }
 .parse-row { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 9px; }
 .source-input { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; align-items: center; min-width: 0; height: 58px; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); transition: border-color .18s ease, box-shadow .18s ease; }
 .source-input:focus-within, .source-input.ready { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(12, 127, 121, .09); }.source-input.invalid { border-color: var(--danger); }
@@ -245,7 +238,7 @@ function selectMode(mode: AccessMode): void {
 @keyframes headline-color { 0%, 36%, 100% { color: var(--accent); } 48%, 84% { color: var(--brand); } }
 
 @media (max-width: 1365px) {
-  .home-view { min-height: calc(100dvh - 60px); }.landing-page { gap: 14px; }.hero-meta { margin-bottom: 14px; }.hero-intro h1 { font-size: 58px; }.hero-description { margin-top: 11px; font-size: 14px; }.parse-workbench { padding: 15px; }.recent-result { min-height: 108px; }.recent-cover { min-height: 106px; }
+  .home-view { min-height: calc(100dvh - 60px); }.landing-page { gap: 14px; }.hero-intro h1 { font-size: 58px; }.hero-description { margin-top: 11px; font-size: 14px; }.parse-workbench { padding: 15px; }.recent-result { min-height: 108px; }.recent-cover { min-height: 106px; }
 }
 
 @media (min-width: 768px) and (max-width: 1040px) {
@@ -253,13 +246,13 @@ function selectMode(mode: AccessMode): void {
 }
 
 @media (max-width: 767px) {
-  .home-view { min-height: calc(100dvh - 174px); align-items: start; }.landing-page { gap: 10px; }.hero-meta { margin-bottom: 9px; }.hero-meta :deep(.auth-badge) { display: none; }.brand-signature { gap: 7px; font-size: 6px; }.brand-signature i { width: 22px; }.hero-intro { justify-items: start; text-align: left; }.hero-intro h1 { font-size: 39px; line-height: 1.12; }.hero-description { margin-top: 7px; font-size: 11px; line-height: 1.55; }
-  .parse-workbench { padding: 10px; }.parse-workbench::before { left: 18px; width: 54px; }.workbench-heading { margin-bottom: 7px; }.workbench-heading > div:first-child { gap: 7px; }.workbench-heading h2 { font-size: 11px; }.auth-explanation { display: none; }.parse-row { grid-template-columns: 1fr; gap: 6px; }.source-input { grid-template-columns: 40px minmax(0, 1fr) 44px; height: 46px; }.source-input :deep(.el-input__wrapper) { min-height: 44px; padding-inline: 9px; }.source-input :deep(.el-input__inner) { font-size: 10px; }.source-icon { height: 26px; font-size: 15px; }.paste-button { width: 36px; height: 36px; }.parse-button { height: 46px; min-height: 46px; }.parse-options { grid-template-columns: 1fr; gap: 4px; margin-top: 6px; }.mode-fieldset button { min-height: 44px; }.mode-node { display: none; }.parse-options > p, .support-note { display: none; }.validation { margin-top: 6px; line-height: 1.35; }
+  .home-view { min-height: calc(100dvh - 174px); align-items: start; }.landing-page { gap: 10px; }.hero-intro { justify-items: start; text-align: left; }.hero-intro h1 { font-size: 37px; line-height: 1.12; }.hero-intro h1 span { margin-bottom: 3px; }.hero-description { margin-top: 7px; font-size: 11px; line-height: 1.55; }
+  .parse-workbench { padding: 10px; }.parse-workbench::before { left: 18px; width: 54px; }.workbench-heading { margin-bottom: 7px; }.workbench-heading > div:first-child { gap: 7px; }.workbench-heading h2 { font-size: 11px; }.auth-context { display: none; }.parse-row { grid-template-columns: 1fr; gap: 6px; }.source-input { grid-template-columns: 40px minmax(0, 1fr) 44px; height: 46px; }.source-input :deep(.el-input__wrapper) { min-height: 44px; padding-inline: 9px; }.source-input :deep(.el-input__inner) { font-size: 10px; }.source-icon { height: 26px; font-size: 15px; }.paste-button { width: 36px; height: 36px; }.parse-button { height: 46px; min-height: 46px; }.parse-options { grid-template-columns: 1fr; gap: 4px; margin-top: 6px; }.mode-fieldset button { min-height: 44px; }.mode-node { display: none; }.parse-options > p, .support-note { display: none; }.validation { margin-top: 6px; line-height: 1.35; }
   .recent-result { grid-template-columns: 104px minmax(0, 1fr) 44px; min-height: 92px; }.recent-cover { min-height: 90px; }.recent-cover > span { right: 5px; bottom: 5px; padding: 2px 4px; font-size: 7px; }.recent-copy { padding: 10px; }.recent-eyebrow { display: block; overflow: hidden; font-size: 6px; text-overflow: ellipsis; white-space: nowrap; }.recent-copy h2 { display: -webkit-box; margin: 5px 0 6px; overflow: hidden; font-size: 11px; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }.recent-meta { gap: 6px; font-size: 8px; }.recent-meta span:first-child { display: none; }.continue-link { min-width: 44px; min-height: 44px; margin-right: 5px; border: 0; color: var(--brand); font-size: 17px; }.continue-link span { display: none; }
   .workflow-line { gap: 6px; min-height: 18px; font-size: 7px; }.workflow-line i { width: 10px; }.workflow-line small { display: none; }
 }
 
 @media (max-width: 374px) {
-  .hero-intro h1 { font-size: 35px; }.hero-description { font-size: 10px; }.recent-result { grid-template-columns: 96px minmax(0, 1fr) 44px; }
+  .hero-intro h1 { font-size: 34px; }.hero-description { font-size: 10px; }.recent-result { grid-template-columns: 96px minmax(0, 1fr) 44px; }
 }
 </style>

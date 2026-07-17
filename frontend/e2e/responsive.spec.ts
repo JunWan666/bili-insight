@@ -7,7 +7,7 @@ interface PageContract {
 }
 
 const pageContracts: PageContract[] = [
-  { path: '/', heading: '视频，别只看表面。' },
+  { path: '/', heading: /从一条链接开始，\s*看清视频的每一层。/ },
   { path: '/recent', heading: '最近解析' },
   { path: '/videos/video-e2e', heading: 'E2E 测试专用：响应式视频解析样本' },
   { path: '/jobs', heading: '任务中心' },
