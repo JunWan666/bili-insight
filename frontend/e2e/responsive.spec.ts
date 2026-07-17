@@ -7,7 +7,7 @@ interface PageContract {
 }
 
 const pageContracts: PageContract[] = [
-  { path: '/', heading: '把视频拆开看。' },
+  { path: '/', heading: '视频，别只看表面。' },
   { path: '/recent', heading: '最近解析' },
   { path: '/videos/video-e2e', heading: 'E2E 测试专用：响应式视频解析样本' },
   { path: '/jobs', heading: '任务中心' },
@@ -81,20 +81,19 @@ test('全部核心页面在目标视口无页面级横向溢出', async ({ page,
   await assertNoPageOverflow(page, '/videos/video-e2e#content-analysis')
 })
 
-test('解析首页以真实记录呈现视频分层结构', async ({ page }) => {
+test('解析首页以真实最近记录建立产品内容预览', async ({ page }) => {
   await page.goto('/')
-  const stage = page.getByTestId('decomposition-stage')
+  const preview = page.getByTestId('recent-result-preview')
 
-  await expect(stage).toBeVisible()
-  await expect(stage.locator('.source-frame img')).toBeVisible()
-  await expect(stage).toContainText('BV1FYT5zkE1q')
-  await expect(stage.locator('.video-track')).toContainText('画面轨')
-  await expect(stage.locator('.audio-track')).toContainText('声音轨')
-  await expect(stage.locator('.data-track')).toContainText('内容层')
+  await expect(preview).toBeVisible()
+  await expect(preview.locator('.recent-cover img')).toBeVisible()
+  await expect(preview).toContainText('E2E 测试专用：响应式视频解析样本')
+  await expect(preview).toContainText('测试数据提供者')
+  await expect(preview).toContainText('BV1FYT5zkE1q')
+  await expect(preview).toContainText('3:38')
 
   await page.getByTestId('video-url-input').fill('BV1FYT5zkE1q')
-  await expect(stage).toHaveClass(/has-source/)
-  await expect(stage.locator('.scene-status')).toContainText('视频源已锁定')
+  await expect(page.locator('.source-input')).toHaveClass(/ready/)
 })
 
 test('桌面工作区充分利用宽度且主要操作位于首屏', async ({ page, testApi }, testInfo) => {
@@ -104,7 +103,7 @@ test('桌面工作区充分利用宽度且主要操作位于首屏', async ({ pa
 
   testApi.setAuthenticated(true)
   const contracts = [
-    { path: '/', view: '.home-view', primary: '.parse-panel' },
+    { path: '/', view: '.home-view', primary: '.parse-workbench' },
     { path: '/recent', view: '.recent-view', primary: '.recent-card:first-of-type' },
     { path: '/jobs', view: '.jobs-view', primary: '.job-card:first-of-type' },
     { path: '/artifacts', view: '.artifacts-view', primary: '.artifact-content' },
@@ -227,7 +226,7 @@ test('手机首屏展示链接输入、身份状态和解析操作', async ({ pa
   for (const [name, locator] of [
     ['链接输入框', page.getByTestId('video-url-input')],
     ['当前身份状态', page.locator('.mobile-header [data-testid="auth-status"]')],
-    ['视频源画面', page.locator('.source-frame')],
+    ['最近解析封面', page.getByTestId('recent-result-preview').locator('.recent-cover')],
     ['开始解析', page.getByTestId('parse-submit')],
   ] as const) {
     await expect(locator, `${name} 应在手机首屏可见`).toBeVisible()
