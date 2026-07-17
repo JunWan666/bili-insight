@@ -3,11 +3,11 @@ import { expect, test } from './fixtures/api'
 
 interface PageContract {
   path: string
-  heading: string
+  heading: string | RegExp
 }
 
 const pageContracts: PageContract[] = [
-  { path: '/', heading: '视频，从来不只是一条播放轨。' },
+  { path: '/', heading: /让视频.*显出结构。/ },
   { path: '/recent', heading: '最近解析' },
   { path: '/videos/video-e2e', heading: 'E2E 测试专用：响应式视频解析样本' },
   { path: '/jobs', heading: '任务中心' },
@@ -81,25 +81,20 @@ test('全部核心页面在目标视口无页面级横向溢出', async ({ page,
   await assertNoPageOverflow(page, '/videos/video-e2e#content-analysis')
 })
 
-test('解析首页以真实记录呈现视频分层结构', async ({ page }, testInfo) => {
+test('解析首页以真实记录呈现视频分层结构', async ({ page }) => {
   await page.goto('/')
-  const viewportWidth = testInfo.project.use.viewport?.width ?? 0
-  const stage = page.locator(
-    viewportWidth <= 1040
-      ? '.mobile-stage [data-testid="decomposition-stage"]'
-      : '.desktop-stage [data-testid="decomposition-stage"]',
-  )
+  const stage = page.getByTestId('decomposition-stage')
 
   await expect(stage).toBeVisible()
   await expect(stage.locator('.source-frame img')).toBeVisible()
   await expect(stage).toContainText('BV1FYT5zkE1q')
-  await expect(stage.locator('.video-layer')).toContainText('视频轨')
-  await expect(stage.locator('.audio-layer')).toContainText('音频轨')
-  await expect(stage.locator('.metadata-layer')).toContainText('内容数据')
+  await expect(stage.locator('.video-track')).toContainText('画面轨')
+  await expect(stage.locator('.audio-track')).toContainText('声音轨')
+  await expect(stage.locator('.data-track')).toContainText('内容层')
 
   await page.getByTestId('video-url-input').fill('BV1FYT5zkE1q')
   await expect(stage).toHaveClass(/has-source/)
-  await expect(stage.locator('.stage-status')).toContainText('视频源已就绪')
+  await expect(stage.locator('.scene-status')).toContainText('视频源已锁定')
 })
 
 test('桌面工作区充分利用宽度且主要操作位于首屏', async ({ page, testApi }, testInfo) => {
@@ -231,8 +226,8 @@ test('手机首屏展示链接输入、身份状态和解析操作', async ({ pa
 
   for (const [name, locator] of [
     ['链接输入框', page.getByTestId('video-url-input')],
-    ['当前身份状态', page.locator('.parse-panel [data-testid="auth-status"]')],
-    ['视频分层预览', page.locator('.mobile-stage [data-testid="decomposition-stage"]')],
+    ['当前身份状态', page.locator('.mobile-header [data-testid="auth-status"]')],
+    ['视频源画面', page.locator('.source-frame')],
     ['开始解析', page.getByTestId('parse-submit')],
   ] as const) {
     await expect(locator, `${name} 应在手机首屏可见`).toBeVisible()
@@ -241,11 +236,6 @@ test('手机首屏展示链接输入、身份状态和解析操作', async ({ pa
     expect(box?.y ?? -1, `${name} 不应位于首屏顶部之外`).toBeGreaterThanOrEqual(0)
     expect((box?.y ?? 0) + (box?.height ?? 0), `${name} 不应被底部导航遮挡`).toBeLessThanOrEqual(visibleBottom + 1)
   }
-
-  const workflowBox = await page.locator('.workflow-copy').boundingBox()
-  expect(workflowBox, '工作流说明应具有可测量区域').not.toBeNull()
-  expect(workflowBox?.y ?? -1, '工作流说明不应位于首屏顶部之外').toBeGreaterThanOrEqual(0)
-  expect((workflowBox?.y ?? 0) + (workflowBox?.height ?? 0), '工作流说明不应被底部导航遮挡').toBeLessThanOrEqual(visibleBottom + 1)
 
   const homeScroll = await page.evaluate(() => ({
     clientHeight: document.documentElement.clientHeight,

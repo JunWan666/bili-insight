@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'is-home-route': route.path === '/' }">
     <aside class="sidebar" :class="{ 'is-collapsed': sidebarCollapsed }">
       <RouterLink class="brand" to="/" aria-label="Bili Insight 首页">
         <span class="brand-mark"><Film /></span>
@@ -230,7 +230,7 @@ onBeforeUnmount(() => {
       <RouterLink to="/settings/auth"><AuthStatusBadge :status="auth.status" :loading="auth.loading" compact /></RouterLink>
     </header>
 
-    <main class="main-content" :class="{ 'is-video-workspace': route.path.startsWith('/videos/'), 'is-sidebar-collapsed': sidebarCollapsed }">
+    <main class="main-content" :class="{ 'is-video-workspace': route.path.startsWith('/videos/'), 'is-sidebar-collapsed': sidebarCollapsed, 'is-home': route.path === '/' }">
       <RouterView v-slot="{ Component }">
         <Transition name="page" mode="out-in">
           <component :is="Component" />
@@ -302,6 +302,7 @@ onBeforeUnmount(() => {
 .auth-card { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line-soft); border-radius: 14px; color: inherit; text-decoration: none; }
 .auth-card small { color: var(--text-tertiary); line-height: 1.4; overflow-wrap: anywhere; }
 .main-content { min-height: 100dvh; margin-left: 248px; padding: 42px clamp(28px, 4vw, 64px) 64px; transition: margin-left .2s ease; }
+.main-content.is-home { height: 100dvh; min-height: 0; padding: 0; overflow: hidden; background: #091113; }
 .sidebar.is-collapsed { width: 84px; padding-inline: 12px; }
 .sidebar.is-collapsed .brand { justify-content: center; padding-inline: 0; }
 .sidebar.is-collapsed .brand-copy,
@@ -353,6 +354,11 @@ onBeforeUnmount(() => {
   .mobile-brand { display: flex; align-items: center; gap: 9px; }
   .mobile-brand .brand-mark { width: 34px; height: 34px; border-radius: 11px; }
   .main-content { min-height: calc(100dvh - 64px); margin-left: 0; padding: 22px 16px calc(88px + env(safe-area-inset-bottom)); }
+  .main-content.is-home { height: calc(100dvh - 64px); min-height: 0; padding: 0; overflow: hidden; }
+  .is-home-route .mobile-header { border-bottom-color: rgba(209, 232, 228, .12); background: #091113; color: #eef7f5; }
+  .is-home-route .mobile-nav { border-top-color: rgba(209, 232, 228, .12); background: #0b1517; }
+  .is-home-route .mobile-nav button { color: #708784; }
+  .is-home-route .mobile-nav button.active { background: #17302e; color: #50d5c4; }
   .mobile-nav {
     position: fixed; inset: auto 0 0; z-index: 40; display: grid; grid-template-columns: repeat(5, 1fr); padding: 7px 8px max(7px, env(safe-area-inset-bottom));
     border-top: 1px solid var(--line-soft); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(18px);
