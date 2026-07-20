@@ -524,9 +524,30 @@ class VideoService:
             source_cids.update(preserved_section_cids)
             used_page_numbers = {part.page_number for part in video.parts}
             next_section_page = max(used_page_numbers, default=0) + 1
+            stale_parts: list[VideoPart] = []
             for old_part in list(video.parts):
                 if old_part.cid not in source_cids:
                     await session.delete(old_part)
+                    stale_parts.append(old_part)
+
+            reordered_parts = [
+                existing_parts[source_part.cid]
+                for source_part in source.parts
+                if source_part.cid in existing_parts
+                and source_part.cid not in preserved_section_cids
+                and existing_parts[source_part.cid].page_number != source_part.page_number
+            ]
+            if reordered_parts:
+                final_page_numbers = {part.page_number for part in source.parts}
+                temporary_page = max(used_page_numbers | final_page_numbers, default=0) + 1
+                for offset, existing_part in enumerate(reordered_parts):
+                    existing_part.page_number = temporary_page + offset
+
+            if stale_parts or reordered_parts:
+                # SQLite checks the unique page constraint row by row. Free old positions
+                # before assigning final numbers so swaps such as 1 <-> 2 cannot collide.
+                await session.flush()
+
             for source_part in source.parts:
                 part = existing_parts.get(source_part.cid)
                 if part is None:

@@ -617,6 +617,32 @@ async def test_video_and_stream_upserts_update_and_remove_stale_rows(
     assert count == 2
 
 
+async def test_video_upsert_reorders_existing_parts_without_unique_constraint(
+    api_client: tuple[Any, Any],
+) -> None:
+    _, app = api_client
+    container = app.state.container
+    reference = await container.provider.normalize_url("BV1FYT5zkE1q")
+    source = await container.provider.get_video(reference)
+    created = await container.video_service._upsert_video(source)
+    original_ids = {part.cid: part.id for part in created.parts}
+
+    reordered_source = replace(
+        source,
+        parts=[
+            replace(source.parts[0], page_number=2),
+            replace(source.parts[1], page_number=1),
+        ],
+    )
+    updated = await container.video_service._upsert_video(reordered_source)
+
+    assert [(part.cid, part.page_number) for part in updated.parts] == [
+        (source.parts[1].cid, 1),
+        (source.parts[0].cid, 2),
+    ]
+    assert {part.cid: part.id for part in updated.parts} == original_ids
+
+
 async def test_video_upsert_identity_is_scoped_by_provider(api_client: tuple[Any, Any]) -> None:
     _, app = api_client
     container = app.state.container
