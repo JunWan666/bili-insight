@@ -79,7 +79,7 @@
 | 依赖与仓库安全 | Python 两组 `pip-audit` 无已知漏洞；npm 官方 registry 审计 0 vulnerabilities；仓库凭据扫描通过 |
 | Compose 配置 | `docker compose --env-file .env.example config --quiet` 通过 |
 | 公开部署入口 | Latest Release 的 Compose、GHCR 环境文件和源码归档可匿名下载；下载后的 Compose 配置校验通过 |
-| 一键部署脚本 | `deploy.sh` 通过 Bash 语法与内置自检；`deploy.ps1` 通过 Windows PowerShell 5 解析、内置自检和真实 Docker 状态/健康查询；两端覆盖现有网络配置保留、显式参数优先与危险目录保护 |
+| 一键部署脚本 | `deploy.sh` 通过 Bash 语法与内置自检，Linux 默认 `/opt/bili-insight` 并启用 Readline 输入；`deploy.ps1` 通过 Windows PowerShell 5 解析、内置自检和真实 Docker 状态/健康查询；两端覆盖现有网络配置保留、显式参数优先与危险目录保护 |
 
 ## 上一交付基线测试记录
 

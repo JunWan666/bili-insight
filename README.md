@@ -156,12 +156,12 @@ Linux / macOS：
 curl -fsSL https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.sh -o /tmp/bili-insight-deploy.sh && bash /tmp/bili-insight-deploy.sh
 ```
 
+Linux 默认部署到 `/opt/bili-insight`。如果当前用户没有 `/opt` 写权限，请使用 `sudo bash /tmp/bili-insight-deploy.sh`，或通过 `--dir` 指定其他目录。交互菜单启用 Readline，可正常使用退格键修改输入。
+
 Windows PowerShell：
 
 ```powershell
-$script = Join-Path $env:TEMP "bili-insight-deploy.ps1"
-Invoke-WebRequest -UseBasicParsing https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1 -OutFile $script
-powershell -NoProfile -ExecutionPolicy Bypass -File $script
+irm https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1 | iex
 ```
 
 脚本提供部署/更新、重启、状态、日志、保留数据卸载和彻底卸载菜单。默认使用 `auto` 模式：优先拉取对应版本的 GHCR 镜像；若包尚未开放匿名拉取或网络不可用，则自动下载同一 Release 的源码并在本机完成 Docker 构建，不需要 GitHub Token。
@@ -173,7 +173,7 @@ bash /tmp/bili-insight-deploy.sh deploy --host 0.0.0.0 --port 8080 --mode auto
 ```
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $script -Action Deploy -HostAddress 0.0.0.0 -Port 8080 -Mode auto
+& ([scriptblock]::Create((irm https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1))) -Action Deploy -HostAddress 0.0.0.0 -Port 8080 -Mode auto
 ```
 
 > [!TIP]

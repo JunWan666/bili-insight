@@ -30,12 +30,12 @@ Linux / macOS：
 curl -fsSL https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.sh -o /tmp/bili-insight-deploy.sh && bash /tmp/bili-insight-deploy.sh
 ```
 
+Linux 默认部署目录为 `/opt/bili-insight`；非 root 用户需要使用 `sudo`，或通过 `--dir` 指向当前用户可写目录。菜单输入使用 Bash Readline，可使用退格键修改目录、端口、版本、菜单选项和确认文本。macOS 默认仍使用 `~/bili-insight`。
+
 Windows PowerShell：
 
 ```powershell
-$script = Join-Path $env:TEMP "bili-insight-deploy.ps1"
-Invoke-WebRequest -UseBasicParsing https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1 -OutFile $script
-powershell -NoProfile -ExecutionPolicy Bypass -File $script
+irm https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1 | iex
 ```
 
 菜单提供部署/更新、重启、状态、日志、保留数据卸载和彻底卸载。普通卸载只执行 `docker compose down --remove-orphans`；彻底卸载必须输入 `DELETE`，才会删除 `bili-insight-runtime`、`bili-insight-secrets` 和部署目录。

@@ -2,7 +2,11 @@
 set -Eeuo pipefail
 
 REPOSITORY="JunWan666/bili-insight"
-DEFAULT_DEPLOY_DIR="${BILI_INSIGHT_DIR:-${HOME}/bili-insight}"
+case "$(uname -s 2>/dev/null || true)" in
+  Linux) PLATFORM_DEFAULT_DEPLOY_DIR='/opt/bili-insight' ;;
+  *) PLATFORM_DEFAULT_DEPLOY_DIR="${HOME:-.}/bili-insight" ;;
+esac
+DEFAULT_DEPLOY_DIR="${BILI_INSIGHT_DIR:-$PLATFORM_DEFAULT_DEPLOY_DIR}"
 DEFAULT_HOST="127.0.0.1"
 DEFAULT_PORT="8080"
 DEFAULT_VERSION="latest"
@@ -83,7 +87,7 @@ usage() {
   help                  显示帮助
 
 选项：
-  --dir PATH            部署目录，默认 ~/bili-insight
+  --dir PATH            部署目录，Linux 默认 /opt/bili-insight
   --host IPV4           监听地址，默认 127.0.0.1；可信局域网可用 0.0.0.0
   --port PORT           Web 端口，默认 8080
   --version TAG         latest 或 v1.2.5 形式的正式版本
@@ -96,18 +100,18 @@ USAGE
 
 pause_menu() {
   printf '\n按回车继续...'
-  read -r _ || true
+  read -e -r _ || true
 }
 
 ask() {
   local prompt="$1" default_value="$2" answer
-  read -r -p "$prompt [$default_value]: " answer || true
+  read -e -r -p "$prompt [$default_value]: " answer || true
   printf '%s' "${answer:-$default_value}"
 }
 
 ask_yes_no() {
   local prompt="$1" default_value="$2" answer
-  read -r -p "$prompt [$default_value]: " answer || true
+  read -e -r -p "$prompt [$default_value]: " answer || true
   answer="$(printf '%s' "${answer:-$default_value}" | tr '[:upper:]' '[:lower:]')"
   case "$answer" in
     y|yes|是|true|1) return 0 ;;
@@ -169,7 +173,11 @@ validate_mode() {
 }
 
 normalize_deploy_dir() {
-  mkdir -p "$DEPLOY_DIR"
+  if ! mkdir -p "$DEPLOY_DIR"; then
+    error "无法创建部署目录：$DEPLOY_DIR"
+    error 'Linux 默认目录位于 /opt；请使用 sudo 运行，或通过 --dir 指定当前用户可写目录。'
+    exit 1
+  fi
   DEPLOY_DIR="$(cd "$DEPLOY_DIR" && pwd -P)"
   if [[ "$DEPLOY_DIR" == '/' || "$DEPLOY_DIR" == "$HOME" ]]; then
     error "拒绝使用危险部署目录：$DEPLOY_DIR"
@@ -530,7 +538,7 @@ purge_all() {
   error '危险操作：将删除容器、bili-insight-runtime、bili-insight-secrets 和部署目录。'
   local confirmation=''
   if [[ -t 0 ]]; then
-    read -r -p '请输入 DELETE 确认彻底删除：' confirmation || true
+    read -e -r -p '请输入 DELETE 确认彻底删除：' confirmation || true
   fi
   if [[ "$confirmation" != 'DELETE' ]]; then
     info '确认文本不匹配，已取消。'
@@ -568,6 +576,9 @@ self_test() {
   ! validate_version main
   validate_mode auto
   validate_mode source
+  if [[ "$(uname -s 2>/dev/null || true)" == 'Linux' ]]; then
+    [[ "$PLATFORM_DEFAULT_DEPLOY_DIR" == '/opt/bili-insight' ]]
+  fi
   original_host="$WEB_HOST_VALUE"
   original_port="$WEB_PORT_VALUE"
   original_host_explicit="$HOST_EXPLICIT"
@@ -655,7 +666,7 @@ main_menu() {
     printf '  %b6%b) 彻底卸载\n' "$C_RED$C_BOLD" "$C_RESET"
     printf '  0) 退出\n\n'
     local choice
-    read -r -p '请选择操作：' choice || true
+    read -e -r -p '请选择操作：' choice || true
     case "$choice" in
       1) interactive_deploy; pause_menu ;;
       2) restart_services; pause_menu ;;
