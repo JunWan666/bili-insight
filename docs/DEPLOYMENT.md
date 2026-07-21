@@ -14,6 +14,7 @@ GitHub 仓库、Release 页面和 Release 部署附件均可匿名访问：
 | --- | --- |
 | 最新 Release | <https://github.com/JunWan666/bili-insight/releases/latest> |
 | Linux/macOS 管理脚本 | <https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.sh> |
+| Windows 一键入口 | <https://github.com/JunWan666/bili-insight/releases/latest/download/install.ps1> |
 | Windows 管理脚本 | <https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1> |
 | Compose | <https://github.com/JunWan666/bili-insight/releases/latest/download/docker-compose.yml> |
 | GHCR 环境文件 | <https://github.com/JunWan666/bili-insight/releases/latest/download/ghcr-compose.env> |
@@ -35,8 +36,10 @@ Linux 默认部署目录为 `/opt/bili-insight`；非 root 用户需要使用 `s
 Windows PowerShell：
 
 ```powershell
-irm https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1 | iex
+irm https://github.com/JunWan666/bili-insight/releases/latest/download/install.ps1 | iex
 ```
+
+`install.ps1` 是保持 ASCII 编码的轻量启动器，负责把带 UTF-8 BOM 的完整中文管理器下载到临时文件，再使用 PowerShell Bypass 启动；这样既兼容经典的 `irm | iex` 命令，也不会破坏 Windows PowerShell 5 的中文菜单编码。
 
 菜单提供部署/更新、重启、状态、日志、保留数据卸载和彻底卸载。普通卸载只执行 `docker compose down --remove-orphans`；彻底卸载必须输入 `DELETE`，才会删除 `bili-insight-runtime`、`bili-insight-secrets` 和部署目录。
 
