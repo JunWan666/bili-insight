@@ -4,6 +4,12 @@
   <p>面向本地单用户与可信环境的 Bilibili 视频解析、在线播放、分析与下载工作台</p>
   <p>支持普通 BV/AV 投稿与番剧 SS/EP，匿名优先，也可使用用户主动上传的 Cookie 获取账号实际拥有的媒体规格。</p>
   <p>
+    <a href="https://github.com/JunWan666/bili-insight/releases/latest"><img src="https://img.shields.io/github/v/release/JunWan666/bili-insight?style=flat-square&label=Release" alt="Latest Release" /></a>
+    <a href="https://github.com/JunWan666/bili-insight/actions/workflows/ci.yml"><img src="https://github.com/JunWan666/bili-insight/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
+    <a href="https://github.com/JunWan666/bili-insight/actions/workflows/publish-images.yml"><img src="https://github.com/JunWan666/bili-insight/actions/workflows/publish-images.yml/badge.svg" alt="Publish Images" /></a>
+    <a href="https://github.com/JunWan666/bili-insight/stargazers"><img src="https://img.shields.io/github/stars/JunWan666/bili-insight?style=flat-square" alt="GitHub Stars" /></a>
+  </p>
+  <p>
     <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12" />
     <img src="https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
     <img src="https://img.shields.io/badge/Vue-3.5-4FC08D?style=for-the-badge&logo=vuedotjs&logoColor=white" alt="Vue 3" />
@@ -24,6 +30,8 @@
     ·
     <a href="#快速开始">快速开始</a>
     ·
+    <a href="#公开入口">公开入口</a>
+    ·
     <a href="#安全边界">安全边界</a>
     ·
     <a href="#项目文档">项目文档</a>
@@ -32,6 +40,19 @@
 
 > [!IMPORTANT]
 > 本项目只用于处理使用者有权访问和使用的内容，不绕过付费、DRM、验证码、平台风控或其他访问控制。Cookie 等同账号会话凭据，请勿分享、提交到 Git 或发送给第三方。
+
+## 公开入口
+
+| 入口 | 地址 |
+| --- | --- |
+| GitHub 源码 | [JunWan666/bili-insight](https://github.com/JunWan666/bili-insight) |
+| 最新版本 | [GitHub Releases](https://github.com/JunWan666/bili-insight/releases/latest) |
+| Linux/macOS 部署脚本 | [deploy.sh](https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.sh) |
+| Windows 部署脚本 | [deploy.ps1](https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1) |
+| Compose 文件 | [docker-compose.yml](https://github.com/JunWan666/bili-insight/releases/latest/download/docker-compose.yml) |
+| GHCR 环境文件 | [ghcr-compose.env](https://github.com/JunWan666/bili-insight/releases/latest/download/ghcr-compose.env) |
+| 问题反馈 | [GitHub Issues](https://github.com/JunWan666/bili-insight/issues) |
+| 构建状态 | [GitHub Actions](https://github.com/JunWan666/bili-insight/actions) |
 
 ## v1.2.5 发布重点
 
@@ -125,55 +146,49 @@ Docker 默认只把 Nginx 发布到 `127.0.0.1`；需要手机访问时可显式
 
 ## 快速开始
 
-### Docker Compose
+### 一键部署（推荐）
 
-环境要求：Docker Engine 24+、Docker Compose 2.24+。
+环境要求：Docker Engine 24+、Docker Compose 2.24+。脚本不会静默安装 Docker，也不会在普通卸载时删除数据库、产物或 Cookie 密钥卷。
+
+Linux / macOS：
+
+```bash
+curl -fsSL https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.sh -o /tmp/bili-insight-deploy.sh && bash /tmp/bili-insight-deploy.sh
+```
+
+Windows PowerShell：
 
 ```powershell
-Copy-Item .env.example .env
-docker compose up --detach --build --wait
+$script = Join-Path $env:TEMP "bili-insight-deploy.ps1"
+Invoke-WebRequest -UseBasicParsing https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1 -OutFile $script
+powershell -NoProfile -ExecutionPolicy Bypass -File $script
 ```
 
-### 使用 GHCR 镜像
+脚本提供部署/更新、重启、状态、日志、保留数据卸载和彻底卸载菜单。默认使用 `auto` 模式：优先拉取对应版本的 GHCR 镜像；若包尚未开放匿名拉取或网络不可用，则自动下载同一 Release 的源码并在本机完成 Docker 构建，不需要 GitHub Token。
 
-发布后的镜像地址为：
-
-```text
-ghcr.io/junwan666/bili-insight-backend:v1.2.5
-ghcr.io/junwan666/bili-insight-frontend:v1.2.5
-```
-
-将 `.env` 中的镜像变量改为：
-
-```dotenv
-BACKEND_IMAGE=ghcr.io/junwan666/bili-insight-backend:v1.2.5
-FRONTEND_IMAGE=ghcr.io/junwan666/bili-insight-frontend:v1.2.5
-```
-
-然后拉取并启动，不再本地构建：
+不进入菜单也可以直接执行：
 
 ```bash
-docker compose pull
-docker compose up --detach --no-build --wait
+bash /tmp/bili-insight-deploy.sh deploy --host 0.0.0.0 --port 8080 --mode auto
 ```
 
-GHCR 包可能继承 GitHub 仓库的私有可见性。首次拉取私有包前需要使用拥有该仓库访问权限的 GitHub Personal Access Token 登录：
-
-```bash
-echo "$CR_PAT" | docker login ghcr.io -u JunWan666 --password-stdin
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $script -Action Deploy -HostAddress 0.0.0.0 -Port 8080 -Mode auto
 ```
 
-### 一键下载 Compose 文件
+> [!TIP]
+> 建议先通过上面的公开链接阅读脚本源码。重复运行同一脚本即可更新；现有 `.env`、监听地址、端口、命名卷和用户数据会保留。命令行或环境变量中显式提供的新地址和端口始终优先。
 
-下面的命令会从 GitHub `v1.2.5` Release 对应的源码标签下载 Compose 文件和 GHCR 配置，不需要克隆整个仓库。当前仓库为私有仓库，先准备一个同时拥有仓库读取权限和 `read:packages` 权限的 GitHub Token：
+### 公开 Release 文件部署
 
-Linux/macOS：
+不使用管理脚本时，也可以直接下载最新 Release 附件。以下链接无需仓库 Token：
+
+Linux / macOS：
 
 ```bash
-export GITHUB_TOKEN=ghp_your_token
-curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.5/docker-compose.yml -o docker-compose.yml
-curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.5/ghcr-compose.env -o .env
-docker login ghcr.io
+mkdir -p bili-insight && cd bili-insight
+curl -fsSL https://github.com/JunWan666/bili-insight/releases/latest/download/docker-compose.yml -o docker-compose.yml
+curl -fsSL https://github.com/JunWan666/bili-insight/releases/latest/download/ghcr-compose.env -o .env
 docker compose pull
 docker compose up --detach --no-build --wait
 ```
@@ -181,21 +196,59 @@ docker compose up --detach --no-build --wait
 Windows PowerShell：
 
 ```powershell
-$headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN" }
-Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.5/docker-compose.yml -OutFile docker-compose.yml
-Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.5/ghcr-compose.env -OutFile .env
-docker login ghcr.io
+New-Item -ItemType Directory -Force bili-insight | Out-Null
+Set-Location bili-insight
+Invoke-WebRequest -UseBasicParsing https://github.com/JunWan666/bili-insight/releases/latest/download/docker-compose.yml -OutFile docker-compose.yml
+Invoke-WebRequest -UseBasicParsing https://github.com/JunWan666/bili-insight/releases/latest/download/ghcr-compose.env -OutFile .env
 docker compose pull
 docker compose up --detach --no-build --wait
 ```
 
-默认只监听本机；需要手机访问时，将下载后的 `.env` 中 `WEB_HOST` 改为 `0.0.0.0`，再执行 `docker compose up --detach --no-build --force-recreate --wait`。
+如果 `docker compose pull` 返回 `401/403`，说明 GHCR 包仍要求登录。此时直接改用一键脚本的 `auto`/`source` 模式，或按下一节从公开源码构建。
 
-Linux/macOS：
+### 从公开源码构建
+
+该方式完全基于公开 GitHub 源码，不依赖 GHCR：
 
 ```bash
+git clone https://github.com/JunWan666/bili-insight.git
+cd bili-insight
 cp .env.example .env
 docker compose up --detach --build --wait
+```
+
+Windows PowerShell：
+
+```powershell
+git clone https://github.com/JunWan666/bili-insight.git
+Set-Location bili-insight
+Copy-Item .env.example .env
+docker compose up --detach --build --wait
+```
+
+当前正式 GHCR 镜像以 `linux/amd64` 为发布基线。ARM64 主机建议使用源码构建模式，让 Docker 在目标主机生成原生架构镜像。
+
+### 手动选择 GHCR 版本
+
+当前正式版本镜像地址：
+
+```text
+ghcr.io/junwan666/bili-insight-backend:v1.2.5
+ghcr.io/junwan666/bili-insight-frontend:v1.2.5
+```
+
+对应 `.env` 配置：
+
+```dotenv
+BACKEND_IMAGE=ghcr.io/junwan666/bili-insight-backend:v1.2.5
+FRONTEND_IMAGE=ghcr.io/junwan666/bili-insight-frontend:v1.2.5
+```
+
+更新时重新下载 Latest Release 的 `.env`，或手动把两个镜像标签改为相同版本，然后执行：
+
+```bash
+docker compose pull
+docker compose up --detach --no-build --force-recreate --wait
 ```
 
 启动后访问：
@@ -283,7 +336,7 @@ bili-insight/
 ├── frontend/                 # Vue 3 响应式 Web 应用
 ├── docker/                   # 前后端镜像与 Nginx 配置
 ├── docs/                     # PRD、部署、安全与实施状态文档
-├── scripts/                  # 初始化、开发启动与凭据扫描脚本
+├── scripts/                  # 一键部署、初始化、开发启动与凭据扫描脚本
 ├── docker-compose.yml        # 本地生产化编排
 └── README.md
 ```

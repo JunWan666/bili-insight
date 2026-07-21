@@ -1,10 +1,10 @@
 # 实施与验收状态
 
-本文档依据 `AGENTS.md` 与 `docs/PRD.md` 维护。状态为 `verified` 表示已具备源码、自动化测试或真实运行证据，并在 2026-07-16 的当前交付验收中通过。
+本文档依据 `AGENTS.md` 与 `docs/PRD.md` 维护。状态为 `verified` 表示已具备源码、自动化测试或真实运行证据，并在 2026-07-22 的当前交付验收中通过。
 
 ## 当前结论
 
-当前版本达到本地单用户/可信环境的 Production Ready 标准。`v1.2.5` 重构解析首页的品牌表达与登录态布局，修复番剧重新解析时的剧集序号冲突，并完善 tag 后自动发布前后端 GHCR 镜像、GitHub Release 与部署附件的交付流程。
+当前版本达到本地单用户/可信环境的 Production Ready 标准。项目已切换为公开 GitHub 分发，README、Release 直链和部署运维文档不再依赖仓库 Token；Linux/macOS 与 Windows 一键管理脚本支持部署、更新、重启、状态、日志、保留数据卸载和受确认保护的彻底卸载，并在 GHCR 匿名拉取不可用时回退到同版本公开源码构建。
 
 ## 当前阶段
 
@@ -16,7 +16,7 @@
 | 媒体与内容分析 | verified | 基础、媒体、音频、字幕、ASR/OCR 适配、镜头、摘要、编辑和导出链路通过 |
 | 在线播放预览 | verified | Shaka 组件、静态 SegmentBase MPD、视频与独立音轨预览、同源 Range 代理、TTL/限额、强制刷新、登录态清理、安全故障注入及真实 4K 播放通过 |
 | Vue 页面与移动端 | verified | 简约单屏解析工作台、最近解析五列竖向网格、同风格设置二级菜单、七个独立设置路径、平板/手机紧凑分组选择器和五项移动导航通过完整跨浏览器矩阵 |
-| Docker、运维与安全 | verified | 最新生产镜像重建、`0006_application_auth` 实际迁移、健康检查、CDN 端口窄放行和预览代理安全测试通过 |
+| Docker、运维与安全 | verified | 最新生产镜像重建、公开 Release 附件、跨平台一键部署管理器、源码构建回退、`0006_application_auth` 实际迁移、健康检查、CDN 端口窄放行和预览代理安全测试通过 |
 | 全量测试与 PRD 审计 | verified | 原 AC 与新增 AC-PARSE-06、AC-PREVIEW、AC-MOBILE-06 均具备自动化及真实运行证据 |
 
 ## PRD 验收追踪
@@ -69,7 +69,7 @@
 
 | 门禁 | 当前结果 |
 | --- | --- |
-| 后端 Pytest | 493 passed，应用覆盖率 86.70%，高于 85% 门槛 |
+| 后端 Pytest | 493 passed，应用覆盖率 86.68%，高于 85% 门槛 |
 | 后端静态检查 | Ruff check、Ruff format check、mypy strict 全部通过 |
 | 前端单元测试 | 19 个文件、106 项 Vitest 全部通过 |
 | 前端静态与构建 | ESLint、Vue/TypeScript typecheck、Vite production build 全部通过 |
@@ -78,6 +78,8 @@
 | 真实番剧播放 | `ss28747` 年度大会员解析得到 19 路视频、3 路音频；4K H.264 + AAC 在 Chromium 中实际播放、暂停和拖动通过 |
 | 依赖与仓库安全 | Python 两组 `pip-audit` 无已知漏洞；npm 官方 registry 审计 0 vulnerabilities；仓库凭据扫描通过 |
 | Compose 配置 | `docker compose --env-file .env.example config --quiet` 通过 |
+| 公开部署入口 | Latest Release 的 Compose、GHCR 环境文件和源码归档可匿名下载；下载后的 Compose 配置校验通过 |
+| 一键部署脚本 | `deploy.sh` 通过 Bash 语法与内置自检；`deploy.ps1` 通过 Windows PowerShell 5 解析、内置自检和真实 Docker 状态/健康查询；两端覆盖现有网络配置保留、显式参数优先与危险目录保护 |
 
 ## 上一交付基线测试记录
 

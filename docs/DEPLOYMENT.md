@@ -6,9 +6,47 @@
 
 主机默认只发布 `${WEB_HOST:-127.0.0.1}:${WEB_PORT}`。这与 PRD 的本地单用户默认模型一致，也避免因误改后端监听地址而直接暴露 Cookie 管理接口。`WEB_HOST=0.0.0.0` 可用于可信局域网内的临时移动端验收，但不会改变后端无主机端口映射的边界。
 
+## 公开分发入口
+
+GitHub 仓库、Release 页面和 Release 部署附件均可匿名访问：
+
+| 资源 | 地址 |
+| --- | --- |
+| 最新 Release | <https://github.com/JunWan666/bili-insight/releases/latest> |
+| Linux/macOS 管理脚本 | <https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.sh> |
+| Windows 管理脚本 | <https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1> |
+| Compose | <https://github.com/JunWan666/bili-insight/releases/latest/download/docker-compose.yml> |
+| GHCR 环境文件 | <https://github.com/JunWan666/bili-insight/releases/latest/download/ghcr-compose.env> |
+
+GHCR 包的可见性由 GitHub Packages 独立管理，不完全跟随源码仓库。管理脚本默认使用 `auto` 模式：先尝试拉取与 Release 匹配的镜像；匿名拉取失败时自动下载同版本源码并在本机构建，因此公开用户不需要 GitHub Token 也能完成部署。
+
 ## 首次部署
 
+### 一键管理脚本
+
+Linux / macOS：
+
 ```bash
+curl -fsSL https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.sh -o /tmp/bili-insight-deploy.sh && bash /tmp/bili-insight-deploy.sh
+```
+
+Windows PowerShell：
+
+```powershell
+$script = Join-Path $env:TEMP "bili-insight-deploy.ps1"
+Invoke-WebRequest -UseBasicParsing https://github.com/JunWan666/bili-insight/releases/latest/download/deploy.ps1 -OutFile $script
+powershell -NoProfile -ExecutionPolicy Bypass -File $script
+```
+
+菜单提供部署/更新、重启、状态、日志、保留数据卸载和彻底卸载。普通卸载只执行 `docker compose down --remove-orphans`；彻底卸载必须输入 `DELETE`，才会删除 `bili-insight-runtime`、`bili-insight-secrets` 和部署目录。
+
+重复部署会保留现有 `.env`，包括已配置的监听地址和端口；本次命令显式传入 `--host`/`--port` 或 `-HostAddress`/`-Port` 时，新参数优先。Windows 脚本通过公开 Release 重定向解析 `latest`，不依赖 GitHub API 匿名请求额度。
+
+### 公开源码部署
+
+```bash
+git clone https://github.com/JunWan666/bili-insight.git
+cd bili-insight
 cp .env.example .env
 docker compose config --quiet
 docker compose up --detach --build --wait
@@ -30,11 +68,21 @@ curl --fail http://127.0.0.1:8080/healthz
 
 ## 更新与回滚
 
-更新前先备份两个命名卷。获取新版本后执行：
+更新前先备份两个命名卷。使用管理脚本部署的实例，重新执行脚本并选择“部署 / 更新”即可；脚本会保留现有 `.env` 与网络监听配置，并在新配置启动失败时恢复上一份部署配置。
+
+源码部署获取新版本后执行：
 
 ```bash
+git pull --ff-only
 docker compose build --pull
 docker compose up --detach --wait
+```
+
+使用 Release GHCR 配置时，先重新下载 Latest Release 的 `ghcr-compose.env` 或把两个镜像标签更新到同一版本，再执行：
+
+```bash
+docker compose pull
+docker compose up --detach --no-build --force-recreate --wait
 ```
 
 数据库迁移在后端启动前执行。回滚应用镜像前必须确认旧版本数据库模型能够读取当前迁移版本；数据库不兼容时，应使用更新前备份恢复到配套数据版本。
