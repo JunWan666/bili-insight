@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-当前版本达到本地单用户/可信环境的 Production Ready 标准。`v1.2.4` 进一步移除解析页冗余英文标签与卡片外壳，将最近解析改为 1440 桌面五列竖向媒体卡，并把七个设置分组拆分为独立路径；侧栏二级菜单与一级菜单共享图标、尺寸和激活样式。
+当前版本达到本地单用户/可信环境的 Production Ready 标准。`v1.2.5` 重构解析首页的品牌表达与登录态布局，修复番剧重新解析时的剧集序号冲突，并完善 tag 后自动发布前后端 GHCR 镜像、GitHub Release 与部署附件的交付流程。
 
 ## 当前阶段
 
@@ -69,11 +69,11 @@
 
 | 门禁 | 当前结果 |
 | --- | --- |
-| 后端 Pytest | 492 passed，应用覆盖率 86.63%，高于 85% 门槛 |
+| 后端 Pytest | 493 passed，应用覆盖率 86.70%，高于 85% 门槛 |
 | 后端静态检查 | Ruff check、Ruff format check、mypy strict 全部通过 |
 | 前端单元测试 | 19 个文件、106 项 Vitest 全部通过 |
 | 前端静态与构建 | ESLint、Vue/TypeScript typecheck、Vite production build 全部通过 |
-| 完整 Playwright 矩阵 | 203 项：180 passed、23 项按设备能力预期 skipped；Chromium 360/390/768/1440、WebKit 手机/桌面和 Firefox 桌面 0 failed |
+| 完整 Playwright 矩阵 | 210 项：187 passed、23 项按设备能力预期 skipped；Chromium 360/390/768/1440、WebKit 手机/桌面和 Firefox 桌面 0 failed |
 | Docker 与迁移 | 最终源码已在 CI 中构建前后端生产镜像并完成 Compose 启动、健康与持久化验收；本机两个容器 healthy，Alembic 为 `0006_application_auth (head)` |
 | 真实番剧播放 | `ss28747` 年度大会员解析得到 19 路视频、3 路音频；4K H.264 + AAC 在 Chromium 中实际播放、暂停和拖动通过 |
 | 依赖与仓库安全 | Python 两组 `pip-audit` 无已知漏洞；npm 官方 registry 审计 0 vulnerabilities；仓库凭据扫描通过 |

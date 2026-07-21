@@ -33,6 +33,13 @@
 > [!IMPORTANT]
 > 本项目只用于处理使用者有权访问和使用的内容，不绕过付费、DRM、验证码、平台风控或其他访问控制。Cookie 等同账号会话凭据，请勿分享、提交到 Git 或发送给第三方。
 
+## v1.2.5 发布重点
+
+- 重构解析首页的品牌表达与登录态布局，在桌面和移动端保持单屏核心流程。
+- 修复番剧重新解析与刷新媒体流时的剧集序号冲突，长 Season 可稳定更新全部分集。
+- 完善 tag 发布自动化：前后端镜像发布成功后自动创建 GitHub Release，并附加 Compose 与 GHCR 配置文件。
+- Release 部署配置固定使用 `v1.2.5` 镜像；同时继续发布 `latest` 与提交 SHA 标签。
+
 ## 项目亮点
 
 - **匿名优先**：无需登录即可解析公开媒体；仅在用户明确选择后使用已校验的 Cookie 登录态。
@@ -132,15 +139,15 @@ docker compose up --detach --build --wait
 发布后的镜像地址为：
 
 ```text
-ghcr.io/junwan666/bili-insight-backend:latest
-ghcr.io/junwan666/bili-insight-frontend:latest
+ghcr.io/junwan666/bili-insight-backend:v1.2.5
+ghcr.io/junwan666/bili-insight-frontend:v1.2.5
 ```
 
 将 `.env` 中的镜像变量改为：
 
 ```dotenv
-BACKEND_IMAGE=ghcr.io/junwan666/bili-insight-backend:latest
-FRONTEND_IMAGE=ghcr.io/junwan666/bili-insight-frontend:latest
+BACKEND_IMAGE=ghcr.io/junwan666/bili-insight-backend:v1.2.5
+FRONTEND_IMAGE=ghcr.io/junwan666/bili-insight-frontend:v1.2.5
 ```
 
 然后拉取并启动，不再本地构建：
@@ -158,14 +165,14 @@ echo "$CR_PAT" | docker login ghcr.io -u JunWan666 --password-stdin
 
 ### 一键下载 Compose 文件
 
-下面的命令会从 GitHub `v1.2.4` Release 对应的源码标签下载 Compose 文件和 GHCR 配置，不需要克隆整个仓库。当前仓库为私有仓库，先准备一个同时拥有仓库读取权限和 `read:packages` 权限的 GitHub Token：
+下面的命令会从 GitHub `v1.2.5` Release 对应的源码标签下载 Compose 文件和 GHCR 配置，不需要克隆整个仓库。当前仓库为私有仓库，先准备一个同时拥有仓库读取权限和 `read:packages` 权限的 GitHub Token：
 
 Linux/macOS：
 
 ```bash
 export GITHUB_TOKEN=ghp_your_token
-curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.4/docker-compose.yml -o docker-compose.yml
-curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.4/ghcr-compose.env -o .env
+curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.5/docker-compose.yml -o docker-compose.yml
+curl -H "Authorization: Bearer ${GITHUB_TOKEN}" -fsSL https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.5/ghcr-compose.env -o .env
 docker login ghcr.io
 docker compose pull
 docker compose up --detach --no-build --wait
@@ -175,8 +182,8 @@ Windows PowerShell：
 
 ```powershell
 $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN" }
-Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.4/docker-compose.yml -OutFile docker-compose.yml
-Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.4/ghcr-compose.env -OutFile .env
+Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.5/docker-compose.yml -OutFile docker-compose.yml
+Invoke-WebRequest -UseBasicParsing -Headers $headers https://raw.githubusercontent.com/JunWan666/bili-insight/v1.2.5/ghcr-compose.env -OutFile .env
 docker login ghcr.io
 docker compose pull
 docker compose up --detach --no-build --wait
