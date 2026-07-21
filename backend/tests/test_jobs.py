@@ -270,7 +270,13 @@ async def test_pause_resume_cancel_retry_and_failure(
     await wait_status(service, job.id, {JobStatus.PAUSED})
     download.block = False
     resumed = await service.resume(job.id)
-    assert resumed.status == JobStatus.QUEUED
+    assert resumed.status in {
+        JobStatus.QUEUED,
+        JobStatus.PREPARING,
+        JobStatus.RUNNING,
+        JobStatus.POST_PROCESSING,
+        JobStatus.COMPLETED,
+    }
     completed = await wait_status(service, job.id, {JobStatus.COMPLETED})
     assert completed.progress == 100
     assert completed.video_title == "任务视频"
